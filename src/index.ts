@@ -1,6 +1,9 @@
 import shaders from "@/shaders/main.wgsl?raw"
-import { glMatrix, mat4, vec3 } from 'gl-matrix'
-import Camera from "./Camera";
+import { mat4, vec3 } from 'gl-matrix'
+import Camera from "./lib/Camera";
+import Controls from "./lib/Controls";
+import Loader from "./lib/Loader";
+import Mesh from "./lib/Mesh";
 
 const canvas = document.getElementsByTagName('canvas')[0];
 const resizeObserver = new ResizeObserver(() => {
@@ -12,8 +15,13 @@ canvas.addEventListener('click', async () => {
   await canvas.requestPointerLock();
 })
 
+const controls = new Controls()
+const loader = new Loader()
+
 
 async function init() {
+  await loader.load();
+
   if (!navigator.gpu) {
     throw Error("WebGPU not supported.");
   }
@@ -36,21 +44,40 @@ async function init() {
     alphaMode: "premultiplied",
   });
 
-  const vertices = new Float32Array([
-    0, 1, 0, 1,
-    0, 0, 1, 1, //c
-    -1, -1, 0, 1,
-    -0, 1, 0, 1, //c
-    1, -1, 0, 1,
-    1, 0, 0, 1, //c
-  ]);
+  const model = loader.get('hand_low_poly')!;
+  const mesh = new Mesh(model);
 
+  const vertices = mesh.vertices();
+  const indices = mesh.indices();
+  // new Float32Array([
+  //   0, 1, 0, 1,
+  //   0, 0, 1, 1, //c
+  //   -1, -1, 0, 1,
+  //   -0, 1, 0, 1, //c
+  //   1, -1, 0, 1,
+  //   1, 0, 0, 1, //c
+  // ]);
+
+  // const vertices = new Float32Array([
+  //   1, 1, 1, -1, 1, 1, -1, -1, 1, 1, -1, 1,      // face #1
+  //   1, 1, 1, 1, -1, 1, 1, -1, -1, 1, 1, -1,      // face #2
+  //   1, 1, 1, 1, 1, -1, -1, 1, -1, -1, 1, 1,       // face #3
+  //   -1, -1, -1, -1, 1, -1, 1, 1, -1, 1, -1, -1,     // face #4
+  //   -1, -1, -1, -1, -1, 1, -1, 1, 1, -1, 1, -1,      // face #5
+  //   -1, -1, -1, 1, -1, -1, 1, -1, 1, -1, -1, 1   // face #6
+  // ]);
+
+  const indicesBuffer = device.createBuffer({
+    size: indices.byteLength,
+    usage: GPUBufferUsage.INDEX | GPUBufferUsage.COPY_DST,
+  })
+
+  device.queue.writeBuffer(indicesBuffer, 0, indices);
 
   const vertexBuffer = device.createBuffer({
     size: vertices.byteLength, // make it big enough to store vertices in
     usage: GPUBufferUsage.VERTEX | GPUBufferUsage.COPY_DST,
   });
-
 
   device.queue.writeBuffer(vertexBuffer, 0, vertices, 0, vertices.length);
 
@@ -60,15 +87,15 @@ async function init() {
         {
           shaderLocation: 0, // position
           offset: 0,
-          format: "float32x4",
+          format: "float32x3",
         },
-        {
-          shaderLocation: 1, // color
-          offset: 16,
-          format: "float32x4",
-        },
+        // {
+        //   shaderLocation: 1, // color
+        //   offset: 12,
+        //   format: "float32x3",
+        // },
       ],
-      arrayStride: 32,
+      arrayStride: 12,
       stepMode: "vertex",
     },
   ];
@@ -90,6 +117,9 @@ async function init() {
     },
     primitive: {
       topology: "triangle-list",
+    },
+    multisample: {
+      count: 1,
     },
     layout: "auto",
   };
@@ -136,63 +166,34 @@ async function init() {
     camera.lookAt(direction)
   }
 
-  document.onkeydown = (e) => {
-    e.preventDefault();
-    console.log(e.keyCode);
-    const k = e.key.toLowerCase()
+  const checkInputs = (dT: number) => {
     const p = camera.position;
     const l = camera.look;
 
-    const speed = 0.05
+    const speed = 0.02 * dT * (controls.has('shift') ? 2 : 1);
 
-    switch (k) {
-      case 'w': {
-        vec3.add(p, p, vec3.scale(l, l, speed))
-        break;
-      }
-      case 's': {
-        vec3.sub(p, p, vec3.scale(l, l, speed))
-        break;
-      }
-      case 'a': {
-        const v = vec3.cross(l, l, [0, 1, 0]);
-        const n = vec3.normalize(v, v);
-        vec3.sub(p, p, vec3.scale(n, n, speed))
+    if (controls.has('w')) {
+      vec3.add(p, p, vec3.scale(l, l, speed))
 
-        break;
-      }
-      case 'd': {
-        const v = vec3.cross(l, l, [0, 1, 0]);
-        const n = vec3.normalize(v, v);
-        vec3.add(p, p, vec3.scale(n, n, speed))
-
-        break;
-
-      }
-      case ' ': {
-        p[2] += speed;
-
-        break;
-      }
-      case 'control': {
-        p[2] -= speed;
-
-        break;
-      }
-
-      case 'q': {
-        l[2] -= speed;
-        break;
-      }
-
-      case 'e': {
-        l[2] += speed;
-
-        break;
-      }
     }
 
-    // camera.lookAt(l);
+    if (controls.has('s')) {
+      vec3.sub(p, p, vec3.scale(l, l, speed))
+
+    }
+
+    if (controls.has('a')) {
+      const v = vec3.cross(l, l, [0, 1, 0]);
+      const n = vec3.normalize(v, v);
+      vec3.sub(p, p, vec3.scale(n, n, speed))
+    }
+
+    if (controls.has('d')) {
+      const v = vec3.cross(l, l, [0, 1, 0]);
+      const n = vec3.normalize(v, v);
+      vec3.add(p, p, vec3.scale(n, n, speed))
+    }
+
     camera.position = p;
   }
 
@@ -202,18 +203,33 @@ async function init() {
     cameraUniformValues.set([...model, ...camera.viewMatrix, ...camera.projectionMatrix])
   }
 
+  const texture = device.createTexture({
+    size: [canvas.width, canvas.height],
+    sampleCount: 4,
+    format: navigator.gpu.getPreferredCanvasFormat(),
+    usage: GPUTextureUsage.RENDER_ATTACHMENT,
+  });
+  let view = texture.createView();
+
+  let startTime = 0;
+  let endTime = 0;
+
   function render() {
-    const tex = context.getCurrentTexture().createView();
+    const dT = endTime - startTime;
+    startTime = performance.now()
+    checkInputs(dT);
     const renderPassDescriptor: GPURenderPassDescriptor = {
       colorAttachments: [
         {
           loadOp: "clear",
           storeOp: "store",
-          view: tex,
+          // resolveTarget: context.getCurrentTexture().createView(),
+          view: context.getCurrentTexture().createView(),
         },
       ],
     };
     calculateCamera();
+
     device.queue.writeBuffer(uniformBuffer, 0, unifromValues);
     device.queue.writeBuffer(cameraUniformBuffer, 0, cameraUniformValues);
 
@@ -223,12 +239,16 @@ async function init() {
     passEncoder.setPipeline(renderPipeline);
     passEncoder.setVertexBuffer(0, vertexBuffer);
     passEncoder.setBindGroup(0, bindGroup);
-    passEncoder.draw(3);
+    passEncoder.setIndexBuffer(indicesBuffer, "uint32");
+    passEncoder.drawIndexed(indices.length)
     passEncoder.end();
 
     device.queue.submit([commandEncoder.finish()]);
 
-    device.queue.onSubmittedWorkDone().then(() => requestAnimationFrame(() => render()))
+    device.queue.onSubmittedWorkDone().then(() => requestAnimationFrame(() => {
+      endTime = performance.now()
+      render()
+    }))
   }
 
   render()

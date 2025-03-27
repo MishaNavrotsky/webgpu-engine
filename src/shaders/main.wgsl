@@ -1,6 +1,6 @@
 struct VertexOut {
   @builtin(position) position: vec4f,
-  @location(0) color: vec4f
+  // @location(0) color: vec4f
 }
 
 struct Uniforms {
@@ -19,12 +19,11 @@ struct Camera {
 
 
 @vertex
-fn vertex_main(@location(0) position: vec4f, @location(1) color: vec4f) -> VertexOut {
+fn vertex_main(@location(0) position: vec4f) -> VertexOut {
   var output: VertexOut;
   output.position = camera.projection * camera.view * camera.model * position;
   // output.position = position;
 
-  output.color = color;
   return output;
 }
 
@@ -38,5 +37,5 @@ fn fragment_main(fragData: VertexOut) -> @location(0) vec4f {
   if (l + r < pow(20,2) ) {
     return vec4f(1,1,0,0);
   }
-  return fragData.color;
+  return vec4f(1, 0, 0, 1);
 }
