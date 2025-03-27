@@ -10,6 +10,15 @@ const ACCESSOR_COMPONENT_TYPE_TO_BYTES = {
   5120: 1,
 }
 
+const ACCESSOR_COMPONENT_TYPE_TO_ARRAY_TYPE = {
+  5126: Float32Array,
+  5125: Uint32Array,
+  5123: Uint16Array,
+  5122: Int16Array,
+  5121: Uint8Array,
+  5120: Int8Array,
+}
+
 const ACCESSOR_TYPE_TO_COUNT = {
   SCALAR: 1,
   VEC2: 2,
@@ -21,7 +30,6 @@ const ACCESSOR_TYPE_TO_COUNT = {
 }
 
 export default class Mesh {
-
   private rawGLB: GLB;
   constructor(glb: GLB) {
     this.rawGLB = glb;
@@ -43,6 +51,9 @@ export default class Mesh {
 
     //@ts-ignore
     const itemByteSize = ACCESSOR_COMPONENT_TYPE_TO_BYTES[accessor.componentType] * ACCESSOR_TYPE_TO_COUNT[accessor.type]
+    //@ts-ignore
+    const Type: typeof ACCESSOR_COMPONENT_TYPE_TO_ARRAY_TYPE[keyof typeof ACCESSOR_COMPONENT_TYPE_TO_ARRAY_TYPE] = ACCESSOR_COMPONENT_TYPE_TO_ARRAY_TYPE[accessor.componentType]
+
     const accessorByteOffset = accessor.byteOffset || 0;
     const bufferViewByteOffset = bufferView.byteOffset || 0;
     const offset = binChunk.byteOffset + bufferViewByteOffset + accessorByteOffset;
@@ -50,21 +61,22 @@ export default class Mesh {
 
     const buffer = binChunk.arrayBuffer.slice(offset, offset + accessor.count * itemByteSize)
     if (buffer.byteLength === 0) debugger;
-    return buffer;
+    return new Type(buffer);
   }
 
-  vertices() {
-    const attributes = this.rawGLB.json.meshes[0].primitives[0].attributes;
-    const buffer = this.resolveAccessorBufferData(attributes.POSITION)
-    const vertices = new Float32Array(buffer)
-    return vertices
-  }
+  resolveMeshesToBytes() {
+    return this.rawGLB.json.meshes.map((m: any) => {
+      const nm = _.cloneDeep(m);
+      nm.primitives.forEach((p: any) => {
+        Object.entries(p.attributes).forEach(([k, v]) => {
+          p.attributes[k] = this.resolveAccessorBufferData(v as number);
+        })
+        p.indices = this.resolveAccessorBufferData(p.indices);
 
-  indices() {
-    const indicesId = this.rawGLB.json.meshes[0].primitives[0].indices;
-    const buffer = this.resolveAccessorBufferData(indicesId)
-    const indices = new Uint32Array(buffer)
-    return indices
+      })
+
+      return nm
+    })
   }
 
 

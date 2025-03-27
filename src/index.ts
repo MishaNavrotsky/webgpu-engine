@@ -47,25 +47,9 @@ async function init() {
   const model = loader.get('hand_low_poly')!;
   const mesh = new Mesh(model);
 
-  const vertices = mesh.vertices();
-  const indices = mesh.indices();
-  // new Float32Array([
-  //   0, 1, 0, 1,
-  //   0, 0, 1, 1, //c
-  //   -1, -1, 0, 1,
-  //   -0, 1, 0, 1, //c
-  //   1, -1, 0, 1,
-  //   1, 0, 0, 1, //c
-  // ]);
-
-  // const vertices = new Float32Array([
-  //   1, 1, 1, -1, 1, 1, -1, -1, 1, 1, -1, 1,      // face #1
-  //   1, 1, 1, 1, -1, 1, 1, -1, -1, 1, 1, -1,      // face #2
-  //   1, 1, 1, 1, 1, -1, -1, 1, -1, -1, 1, 1,       // face #3
-  //   -1, -1, -1, -1, 1, -1, 1, 1, -1, 1, -1, -1,     // face #4
-  //   -1, -1, -1, -1, -1, 1, -1, 1, 1, -1, 1, -1,      // face #5
-  //   -1, -1, -1, 1, -1, -1, 1, -1, 1, -1, -1, 1   // face #6
-  // ]);
+  const resolvedMesh = mesh.resolveMeshesToBytes();
+  const vertices = resolvedMesh[0].primitives[0].attributes.POSITION;
+  const indices = resolvedMesh[0].primitives[0].indices;
 
   const indicesBuffer = device.createBuffer({
     size: indices.byteLength,
