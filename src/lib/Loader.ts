@@ -8,8 +8,8 @@ export default class Loader {
   }
 
   async load() {
-    const s = await load('assets/hand_low_poly.glb', GLBLoader)
-    this.models.set('hand_low_poly', s);
+    this.models.set('hand_low_poly', await load('assets/hand_low_poly.glb', GLBLoader))
+    this.models.set('alicev2rigged', await load('assets/alicev2rigged.glb', GLBLoader))
   }
 
   get(name: string): GLB | undefined {

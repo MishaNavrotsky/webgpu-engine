@@ -44,6 +44,10 @@ export default class Mesh {
     return this.rawGLB.json.bufferViews[id]
   }
 
+  private getMaterial(id: number) {
+    return this.rawGLB.json.materials[id];
+  }
+
   private resolveAccessorBufferData(accessorId: number) {
     const accessor = this.getAccessor(accessorId)
     const bufferView = this.getBufferView(accessor.bufferView)
@@ -64,19 +68,46 @@ export default class Mesh {
     return new Type(buffer);
   }
 
-  resolveMeshesToBytes() {
-    return this.rawGLB.json.meshes.map((m: any) => {
+  private async resolveTextureByMaterial(materialId: number) {
+    const material = this.getMaterial(materialId);
+    if (!material) return;
+    const textureId = material.pbrMetallicRoughness?.baseColorTexture?.index;
+    if (!textureId) return;
+
+
+    const texture = this.rawGLB.json.textures[textureId];
+    const sampler = this.rawGLB.json.samplers[texture.sampler]
+    const textureSource = texture.source;
+    const image = this.rawGLB.json.images[textureSource];
+    const bufferView = this.getBufferView(image.bufferView)
+
+    const binChunk = this.rawGLB.binChunks[0];
+    const bufferViewByteOffset = bufferView.byteOffset || 0;
+    const offset = binChunk.byteOffset + bufferViewByteOffset;
+
+    const buffer = binChunk.arrayBuffer.slice(offset, offset + bufferView.byteLength);
+    const blob = new Blob([buffer], { type: image.mimeType });
+    const url = URL.createObjectURL(blob);
+    const img = document.createElement('img');
+    img.src = url;
+    await img.decode();
+    return { image: await createImageBitmap(img), sampler }
+  }
+
+  async resolveMeshesToBytes() {
+    const values = await Promise.all(this.rawGLB.json.meshes.map(async (m: any) => {
       const nm = _.cloneDeep(m);
-      nm.primitives.forEach((p: any) => {
+      for (let p of nm.primitives) {
         Object.entries(p.attributes).forEach(([k, v]) => {
           p.attributes[k] = this.resolveAccessorBufferData(v as number);
         })
         p.indices = this.resolveAccessorBufferData(p.indices);
-
-      })
+        p.colorTexture = await this.resolveTextureByMaterial(p.material)
+      }
 
       return nm
-    })
+    }))
+    return values
   }
 
 
