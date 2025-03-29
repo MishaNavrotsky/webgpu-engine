@@ -235,15 +235,15 @@ canvas.addEventListener('click', async () => {
 //   }
 
 
-//   const depthStencilTexture = device.createTexture({
-//     format: 'depth24plus-stencil8',
-//     size: {
-//       width: canvas.width,
-//       height: canvas.height,
-//       depthOrArrayLayers: 1
-//     },
-//     usage: GPUTextureUsage.RENDER_ATTACHMENT | GPUTextureUsage.COPY_DST,
-//   })
+// const depthStencilTexture = device.createTexture({
+//   format: 'depth24plus-stencil8',
+//   size: {
+//     width: canvas.width,
+//     height: canvas.height,
+//     depthOrArrayLayers: 1
+//   },
+//   usage: GPUTextureUsage.RENDER_ATTACHMENT | GPUTextureUsage.COPY_DST,
+// })
 //   const depthStencilView = depthStencilTexture.createView({
 //     format: 'depth24plus-stencil8',
 //     dimension: '2d',

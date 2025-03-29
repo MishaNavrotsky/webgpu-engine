@@ -1,16 +1,16 @@
 export default class Controls {
-  private keysMap: Map<string, boolean> = new Map();
+  private _keysMap: Map<string, boolean> = new Map();
   private _mousePos: [number, number] = [0, 0]
   private _dMousePos: [number, number] = [0, 0]
   subscribe() {
     document.addEventListener('keydown', (e) => {
-      this.keysMap.set(e.key.toLowerCase(), true)
+      this._keysMap.set(e.key.toLowerCase(), true)
     })
     document.addEventListener('keyup', (e) => {
-      this.keysMap.delete(e.key.toLowerCase())
+      this._keysMap.delete(e.key.toLowerCase())
     })
     document.addEventListener('mouseout', (e) => {
-      this.keysMap.clear();
+      this._keysMap.clear();
     })
 
     document.addEventListener('mousemove', (e) => {
@@ -21,7 +21,7 @@ export default class Controls {
   }
 
   keyPressed(input: string): boolean {
-    return this.keysMap.has(input);
+    return this._keysMap.has(input);
   }
 
   get mousePos() {

@@ -1,115 +1,73 @@
-import { GLB } from "@loaders.gl/gltf";
-import _ from 'lodash'
+import { vec3, mat4, quat } from "gl-matrix";
+import Material from "./Material"
 
-const ACCESSOR_COMPONENT_TYPE_TO_BYTES = {
-  5126: 4,
-  5125: 4,
-  5123: 2,
-  5122: 4,
-  5121: 1,
-  5120: 1,
+export type MeshConstructor = {
+  id: string,
+  material: Material,
+  textures: Array<Float32Array>,
+  vertecies: Float32Array,
+  indices: Uint32Array,
 }
-
-const ACCESSOR_COMPONENT_TYPE_TO_ARRAY_TYPE = {
-  5126: Float32Array,
-  5125: Uint32Array,
-  5123: Uint16Array,
-  5122: Int16Array,
-  5121: Uint8Array,
-  5120: Int8Array,
-}
-
-const ACCESSOR_TYPE_TO_COUNT = {
-  SCALAR: 1,
-  VEC2: 2,
-  VEC3: 3,
-  VEC4: 4,
-  MAT2: 4,
-  MAT3: 9,
-  MAR4: 16,
-}
-
 export default class Mesh {
-  private rawGLB: GLB;
-  constructor(glb: GLB) {
-    this.rawGLB = glb;
-    console.log(this.rawGLB)
+  private _settings: MeshConstructor;
+  private _vTranslate: vec3 = vec3.create();
+  private _vRotate: vec3 = vec3.create();
+  private _vOrigin: vec3 = vec3.create();
+  private _vScale: vec3 = vec3.create();
+
+  constructor(settings: MeshConstructor) {
+    this._settings = settings;
   }
 
-  private getAccessor(id: number) {
-    return this.rawGLB.json.accessors[id]
+  get vertecies(): Float32Array {
+    return this._settings.vertecies;
   }
 
-  private getBufferView(id: number) {
-    return this.rawGLB.json.bufferViews[id]
+  get indices(): Uint32Array {
+    return this._settings.indices;
   }
 
-  private getMaterial(id: number) {
-    return this.rawGLB.json.materials[id];
+  get material(): Material {
+    return this._settings.material;
   }
 
-  private resolveAccessorBufferData(accessorId: number) {
-    const accessor = this.getAccessor(accessorId)
-    const bufferView = this.getBufferView(accessor.bufferView)
-    const binChunk = this.rawGLB.binChunks[0];
+  get modelMatrix() {
+    const m = mat4.create()
+    const qRotation = quat.fromEuler(quat.create(), this._vRotate[0], this._vRotate[1], this._vRotate[2]);
+    mat4.fromRotationTranslationScaleOrigin(m, qRotation, this._vTranslate, this._vScale, this._vOrigin);
 
-    //@ts-ignore
-    const itemByteSize = ACCESSOR_COMPONENT_TYPE_TO_BYTES[accessor.componentType] * ACCESSOR_TYPE_TO_COUNT[accessor.type]
-    //@ts-ignore
-    const Type: typeof ACCESSOR_COMPONENT_TYPE_TO_ARRAY_TYPE[keyof typeof ACCESSOR_COMPONENT_TYPE_TO_ARRAY_TYPE] = ACCESSOR_COMPONENT_TYPE_TO_ARRAY_TYPE[accessor.componentType]
-
-    const accessorByteOffset = accessor.byteOffset || 0;
-    const bufferViewByteOffset = bufferView.byteOffset || 0;
-    const offset = binChunk.byteOffset + bufferViewByteOffset + accessorByteOffset;
-
-
-    const buffer = binChunk.arrayBuffer.slice(offset, offset + accessor.count * itemByteSize)
-    if (buffer.byteLength === 0) debugger;
-    return new Type(buffer);
+    return m;
   }
 
-  private async resolveTextureByMaterial(materialId: number) {
-    const material = this.getMaterial(materialId);
-    if (!material) return;
-    const textureId = material.pbrMetallicRoughness?.baseColorTexture?.index;
-    if (!textureId) return;
-
-
-    const texture = this.rawGLB.json.textures[textureId];
-    const sampler = this.rawGLB.json.samplers[texture.sampler]
-    const textureSource = texture.source;
-    const image = this.rawGLB.json.images[textureSource];
-    const bufferView = this.getBufferView(image.bufferView)
-
-    const binChunk = this.rawGLB.binChunks[0];
-    const bufferViewByteOffset = bufferView.byteOffset || 0;
-    const offset = binChunk.byteOffset + bufferViewByteOffset;
-
-    const buffer = binChunk.arrayBuffer.slice(offset, offset + bufferView.byteLength);
-    const blob = new Blob([buffer], { type: image.mimeType });
-    const url = URL.createObjectURL(blob);
-    const img = document.createElement('img');
-    img.src = url;
-    await img.decode();
-    return { image: await createImageBitmap(img), sampler }
+  set translation(v: vec3) {
+    vec3.copy(this._vTranslate, v);
   }
 
-  async resolveMeshesToBytes() {
-    const values = await Promise.all(this.rawGLB.json.meshes.map(async (m: any) => {
-      const nm = _.cloneDeep(m);
-      for (let p of nm.primitives) {
-        Object.entries(p.attributes).forEach(([k, v]) => {
-          p.attributes[k] = this.resolveAccessorBufferData(v as number);
-        })
-        p.indices = this.resolveAccessorBufferData(p.indices);
-        p.colorTexture = await this.resolveTextureByMaterial(p.material)
-      }
-
-      return nm
-    }))
-    return values
+  set rotation(v: vec3) {
+    vec3.copy(this._vRotate, v);
   }
 
+  set origin(v: vec3) {
+    vec3.copy(this._vOrigin, v);
+  }
 
+  set scale(v: vec3) {
+    vec3.copy(this._vScale, v);
+  }
 
+  get translate() {
+    return vec3.clone(this._vTranslate);
+  }
+
+  get rotation() {
+    return vec3.clone(this._vRotate);
+  }
+
+  get origin() {
+    return vec3.clone(this._vOrigin);
+  }
+
+  get scale() {
+    return vec3.clone(this._vScale);
+  }
 }

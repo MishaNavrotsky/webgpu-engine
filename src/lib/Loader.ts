@@ -3,7 +3,7 @@ import { GLB, GLBLoader } from '@loaders.gl/gltf';
 
 export default class Loader {
   private _GLBEntries: Map<string, GLB> = new Map();
-  private _ShaderEntries: Map<string, string> = new Map();
+  private _shaderEntries: Map<string, string> = new Map();
 
   constructor() {
 
@@ -22,7 +22,7 @@ export default class Loader {
   }
 
   async loadShader(id: string, path: string) {
-    this._ShaderEntries.set(this.getShaderId(id), await (await fetch(path)).text());
+    this._shaderEntries.set(this.getShaderId(id), await (await fetch(path)).text());
   }
 
   getGLB(id: string): GLB | undefined {
@@ -30,6 +30,6 @@ export default class Loader {
   }
 
   getShader(id: string): string | undefined {
-    return this._ShaderEntries.get(this.getShaderId(id))
+    return this._shaderEntries.get(this.getShaderId(id))
   }
 }

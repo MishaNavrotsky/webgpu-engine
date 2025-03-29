@@ -3,21 +3,23 @@ import Loader from "./Loader";
 import Renderer from "./Renderer";
 
 export default class Engine {
-  private renderer: Renderer;
-  private loader: Loader;
-  private controls: Controls;
+  private _renderer: Renderer;
+  private _loader: Loader;
+  private _controls: Controls;
   constructor(renderer: Renderer, loader: Loader, controls: Controls) {
-    this.renderer = renderer;
-    this.loader = loader;
-    this.controls = controls;
+    this._renderer = renderer;
+    this._loader = loader;
+    this._controls = controls;
   }
 
   async start() {
-    this.controls.subscribe();
-    await this.loader.loadShader('shader', '/assets/shaders/main.wgsl');
-    await this.renderer.initWebGpuCanvasContext();
+    this._controls.subscribe();
+    await this._loader.loadShader('shader', '/assets/shaders/main.wgsl');
+    await this._loader.loadShader('defaultMaterial', '/assets/shaders/defaultMaterial.wgsl');
+    await this._loader.loadGLB('tyan', '/assets/models/alicev2rigged.glb');
+    await this._renderer.initWebGpuCanvasContext();
 
-    const repeat = () => requestAnimationFrame(() => { this.mainLoop(); repeat() })
+    const repeat = () => requestAnimationFrame(async () => { await this.mainLoop(); repeat() })
     repeat();
   }
 
@@ -26,11 +28,11 @@ export default class Engine {
   private endFrameTime = 0;
   private dT = 0;
 
-  private mainLoop() {
+  private async mainLoop() {
     this.startFrameTime = performance.now();
 
-    this.renderer.render(this.dT);
-    this.controls.clearDeltaMouse();
+    await this._renderer.render(this.dT);
+    this._controls.clearDeltaMouse();
 
     this.endFrameTime = performance.now();
 
