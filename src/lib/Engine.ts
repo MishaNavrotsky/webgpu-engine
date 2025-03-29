@@ -13,8 +13,9 @@ export default class Engine {
   }
 
   async start() {
-    await this.loader.load();
     this.controls.subscribe();
+    await this.loader.loadShader('shader', '/assets/shaders/main.wgsl');
+    await this.renderer.initWebGpuCanvasContext();
 
     const repeat = () => requestAnimationFrame(() => { this.mainLoop(); repeat() })
     repeat();

@@ -1,9 +1,6 @@
-import shaders from "@/shaders/main.wgsl?raw"
-import { mat4, vec3 } from 'gl-matrix'
 import Camera from "./lib/Camera";
 import Controls from "./lib/Controls";
 import Loader from "./lib/Loader";
-import Mesh from "./lib/Mesh";
 import Engine from "./lib/Engine";
 import Renderer from "./lib/Renderer";
 
@@ -331,7 +328,7 @@ async function init() {
   const loader = new Loader();
   const controls = new Controls();
   const camera = new Camera(controls)
-  const renderer = new Renderer(camera, canvas);
+  const renderer = new Renderer(camera, loader, canvas);
   const engine = new Engine(renderer, loader, controls);
   await engine.start();
 }

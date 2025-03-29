@@ -2,17 +2,34 @@ import { load } from '@loaders.gl/core';
 import { GLB, GLBLoader } from '@loaders.gl/gltf';
 
 export default class Loader {
-  private models: Map<string, GLB> = new Map();
+  private _GLBEntries: Map<string, GLB> = new Map();
+  private _ShaderEntries: Map<string, string> = new Map();
+
   constructor() {
 
   }
 
-  async load() {
-    this.models.set('hand_low_poly', await load('assets/hand_low_poly.glb', GLBLoader))
-    this.models.set('alicev2rigged', await load('assets/alicev2rigged.glb', GLBLoader))
+  private getGLBId(id: string) {
+    return `GLB/${id}`
   }
 
-  get(name: string): GLB | undefined {
-    return this.models.get(name);
+  private getShaderId(id: string) {
+    return `Shader/${id}`
+  }
+
+  async loadGLB(id: string, path: string) {
+    this._GLBEntries.set(this.getGLBId(id), await load(path, GLBLoader))
+  }
+
+  async loadShader(id: string, path: string) {
+    this._ShaderEntries.set(this.getShaderId(id), await (await fetch(path)).text());
+  }
+
+  getGLB(id: string): GLB | undefined {
+    return this._GLBEntries.get(this.getGLBId(id));
+  }
+
+  getShader(id: string): string | undefined {
+    return this._ShaderEntries.get(this.getShaderId(id))
   }
 }

@@ -73,6 +73,11 @@ class Camera {
     return cloneProjection;
   }
 
+  get PVMatrix(): mat4 {
+    const pv = mat4.create();
+    return mat4.mul(pv, this.projectionMatrix, this.viewMatrix)
+  }
+
   get look(): vec3 {
     return vec3.clone(this.lookVector);
   }
@@ -129,9 +134,11 @@ class Camera {
     this.translateVector = p;
   }
 
-  calculate(dT: number) {
+  calculate(dT: number): mat4 {
     this.calculateRotation(dT);
     this.calculatePosition(dT);
+
+    return this.PVMatrix;
   }
 }
 
