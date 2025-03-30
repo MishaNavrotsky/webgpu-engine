@@ -10,10 +10,10 @@ export type MeshConstructor = {
 }
 export default class Mesh {
   private _settings: MeshConstructor;
-  private _vTranslate: vec3 = vec3.create();
+  private _vTranslate: vec3 = vec3.fromValues(1, 1, 1);
   private _vRotate: vec3 = vec3.create();
   private _vOrigin: vec3 = vec3.create();
-  private _vScale: vec3 = vec3.create();
+  private _vScale: vec3 = vec3.fromValues(1, 1, 1);
 
   constructor(settings: MeshConstructor) {
     this._settings = settings;

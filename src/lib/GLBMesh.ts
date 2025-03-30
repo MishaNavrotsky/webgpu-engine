@@ -33,7 +33,6 @@ export default class GLBMesh {
   private _rawGLB: GLB;
   constructor(glb: GLB) {
     this._rawGLB = glb;
-    console.log(this._rawGLB)
   }
 
   private getAccessor(id: number) {

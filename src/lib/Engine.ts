@@ -1,15 +1,21 @@
+import UI from "@/ui";
 import Controls from "./Controls";
 import Loader from "./Loader";
 import Renderer from "./Renderer";
+
+export type EngineConstructor = {
+  renderer: Renderer, loader: Loader, controls: Controls, ui?: UI
+}
 
 export default class Engine {
   private _renderer: Renderer;
   private _loader: Loader;
   private _controls: Controls;
-  constructor(renderer: Renderer, loader: Loader, controls: Controls) {
-    this._renderer = renderer;
-    this._loader = loader;
-    this._controls = controls;
+  private _ui: UI | undefined;
+  constructor(settings: EngineConstructor) {
+    this._renderer = settings.renderer;
+    this._loader = settings.loader;
+    this._controls = settings.controls;
   }
 
   async start() {
@@ -23,20 +29,35 @@ export default class Engine {
     repeat();
   }
 
+  setUI(ui: UI) {
+    this._ui = ui;
+    ui.init();
+  }
+
 
   private startFrameTime = 0;
   private endFrameTime = 0;
   private dT = 0;
+  private _gpuPipelineTimings = { cpu: 0, gpu: 0 }
 
   private async mainLoop() {
     this.startFrameTime = performance.now();
 
     await this._renderer.render(this.dT);
-    this._controls.clearDeltaMouse();
+    this._gpuPipelineTimings = this._renderer.getTimings()
 
     this.endFrameTime = performance.now();
 
     this.dT = this.endFrameTime - this.startFrameTime;
+
+    this._ui?.refresh()
   }
 
+  getPerformance() {
+    return {
+      ...this._gpuPipelineTimings,
+      dT: this.dT
+    }
+
+  }
 }

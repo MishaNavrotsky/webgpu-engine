@@ -13,9 +13,34 @@ class Camera {
 
   private _controls: Controls;
 
-  _fov: number = 90;
-  _width: number = 300;
-  _height: number = 300;
+  private _fov: number = 90;
+  private _width: number = 300;
+  private _height: number = 300;
+
+  get fov() {
+    return this._fov
+  }
+
+  get width() {
+    return this._width
+
+  }
+
+  get height() {
+    return this._height
+  }
+
+  set fov(v: number) {
+    this.setPerspective(this._width, this._height, v);
+  }
+
+  set width(v: number) {
+    this.setPerspective(v, this._height, this._fov);
+  }
+
+  set height(v: number) {
+    this.setPerspective(this._width, v, this._fov);
+  }
 
   constructor(controls: Controls) {
     this._controls = controls;
@@ -31,11 +56,10 @@ class Camera {
 
   setPerspective(width: number, height: number, fov: number) {
     this._fov = fov;
-    this._width = height;
+    this._width = width;
     this._height = height;
 
-    mat4.perspectiveZO(this._mProjection, glMatrix.toRadian(fov), width / height, 0, Infinity);
-    // mat4.orthoZO(this.projection, -2, -2, -2, 2, 0, Infinity);
+    mat4.perspectiveZO(this._mProjection, glMatrix.toRadian(this._fov), this._width / this._height, 0, Infinity);
   }
 
   lookAt(v: vec3) {
@@ -130,6 +154,7 @@ class Camera {
   calculate(dT: number): mat4 {
     this.calculateRotation(dT);
     this.calculatePosition(dT);
+    this._controls.clearDeltaMouse();
 
     return this.PVMatrix;
   }

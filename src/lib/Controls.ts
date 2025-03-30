@@ -14,6 +14,7 @@ export default class Controls {
     })
 
     document.addEventListener('mousemove', (e) => {
+      if (!document.pointerLockElement) return;
       this._mousePos = [e.clientX, e.clientY]
       this._dMousePos = [this._dMousePos[0] + e.movementX, this._dMousePos[1] + e.movementY];
 

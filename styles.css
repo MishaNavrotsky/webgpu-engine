@@ -10,13 +10,14 @@
 
 body {
   background-color: black;
+  overflow: hidden;
 }
 
-div {
+#app {
   height: 100dvh;
 }
 
-canvas {
+#app>canvas {
   display: block;
   height: 100%;
   width: 100%;
