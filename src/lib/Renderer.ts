@@ -45,6 +45,7 @@ export default class Renderer {
       const renderPassDescriptor: GPURenderPassDescriptor = {
         colorAttachments: [
           {
+            clearValue: { r: 0.5294, g: 0.8039, b: 0.9725, a: 1.0 },
             loadOp: "clear",
             storeOp: "store",
             view: this._context.getCurrentTexture().createView(),
@@ -201,6 +202,7 @@ export default class Renderer {
       format: 'depth24plus',
       size: [this._canvas.width, this._canvas.height],
       usage: GPUTextureUsage.RENDER_ATTACHMENT,
+      dimension: '2d',
     });
     this._depthTextureView = this._depthTexture.createView();
     this._depthTextureSampler = this._device.createSampler({
