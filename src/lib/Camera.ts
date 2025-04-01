@@ -13,7 +13,7 @@ class Camera {
 
   private _controls: Controls;
 
-  private _fov: number = 45;
+  private _fov: number = 90;
   private _width: number = 300;
   private _height: number = 300;
 

@@ -12,7 +12,7 @@ export default class Renderer {
   private _camera: Camera;
   private _loader: Loader;
   private _canvas: HTMLCanvasElement
-  private _fov: number = 45;
+  private _fov: number = 90;
   private _lastCpuTime = 0;
   private _lastGpuTime = 0;
   constructor(camera: Camera, loader: Loader, canvas: HTMLCanvasElement) {
@@ -128,7 +128,7 @@ export default class Renderer {
           depthStencil: {
             format: 'depth24plus',
             depthWriteEnabled: true,
-            depthCompare: 'less-equal',
+            depthCompare: 'less',
           }
         };
 
@@ -233,7 +233,7 @@ export default class Renderer {
     })
 
 
-    // const model = await new GLBMesh(await this._loader.getGLB('tyan')!).resolveMeshesToBytes()
+    const model = await new GLBMesh(await this._loader.getGLB('tyan')!).resolveMeshesToBytes()
 
     const readyMesh = (m: Mesh) => {
       const readyMesh: MeshData[0] = {
@@ -304,5 +304,19 @@ export default class Renderer {
     this._meshes.push(f1);
     this._meshes.push(f2);
 
+    model.forEach(m => {
+      const t = new Mesh({
+        id: 'triangle1',
+        indices: m.primitives[0].indices,
+        material: defaultMaterial,
+        textures: { color: m.primitives[0].colorTexture?.image || this._loader.getDefaultTexture() },
+        vertecies: m.primitives[0].attributes.POSITION,
+        texCoords: m.primitives[0].attributes.TEXCOORD_0,
+      })
+
+      t.scale = [0.01, 0.01, 0.01]
+
+      this._meshes.push(readyMesh(t));
+    })
   }
 }
