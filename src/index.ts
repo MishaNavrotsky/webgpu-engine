@@ -329,6 +329,7 @@ canvas.addEventListener('click', async () => {
 
 async function init() {
   const loader = new Loader();
+  await loader.init();
   const controls = new Controls();
   const camera = new Camera(controls)
   const renderer = new Renderer(camera, loader, canvas);

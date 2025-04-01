@@ -4,9 +4,20 @@ import { GLB, GLBLoader } from '@loaders.gl/gltf';
 export default class Loader {
   private _GLBEntries: Map<string, GLB> = new Map();
   private _shaderEntries: Map<string, string> = new Map();
+  private _defaultTexture!: ImageBitmap;
 
   constructor() {
 
+  }
+
+  async init() {
+    const i = new Image();
+    i.src = 'assets/textures/default-texture.png'
+    this._defaultTexture = await new Promise((res, rej) => {
+      i.onload = async (ev) => {
+        res(await createImageBitmap(i))
+      }
+    })
   }
 
   private getGLBId(id: string) {
@@ -31,5 +42,9 @@ export default class Loader {
 
   getShader(id: string): string | undefined {
     return this._shaderEntries.get(this.getShaderId(id))
+  }
+
+  getDefaultTexture(): ImageBitmap {
+    return this._defaultTexture;
   }
 }

@@ -4,7 +4,7 @@ import Material from "./Material"
 export type MeshConstructor = {
   id: string,
   material: Material,
-  textures: { color?: ArrayBufferLike },
+  textures: { color: ImageBitmap },
   vertecies: Float32Array,
   indices: Uint32Array,
   texCoords: Float32Array,

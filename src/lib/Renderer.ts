@@ -34,6 +34,8 @@ export default class Renderer {
     return { cpu: this._lastCpuTime, gpu: this._lastGpuTime }
   }
 
+
+
   async render(dT: number) {
     const cpuTimeStart = performance.now()
     {
@@ -65,7 +67,6 @@ export default class Renderer {
         const verticesBuffer = m.verticesBuffer;
         const indicesBuffer = m.indicesBuffer;
         const texCoordsBuffer = m.texCoordsBuffer;
-        if (!m.textures.color) continue;
 
         const material = mesh.material;
         const modelMatrix = mesh.modelMatrix;
@@ -82,11 +83,6 @@ export default class Renderer {
                 offset: 0,
                 format: "float32x3",
               },
-              // {
-              //   shaderLocation: 1, // color
-              //   offset: 12,
-              //   format: "float32x3",
-              // },
             ],
             arrayStride: 12,
             stepMode: "vertex",
@@ -122,7 +118,7 @@ export default class Renderer {
           primitive: {
             topology: "triangle-list",
             frontFace: "ccw",
-            cullMode: 'none'
+            cullMode: 'back'
           },
           multisample: {
             count: 1,
@@ -131,7 +127,7 @@ export default class Renderer {
           depthStencil: {
             format: 'depth24plus',
             depthWriteEnabled: true,
-            depthCompare: 'less',
+            depthCompare: 'less-equal',
           }
         };
 
@@ -235,44 +231,34 @@ export default class Renderer {
     })
 
 
-    const model = await new GLBMesh(await this._loader.getGLB('tyan')!).resolveMeshesToBytes()
+    // const model = await new GLBMesh(await this._loader.getGLB('tyan')!).resolveMeshesToBytes()
 
-    model.forEach(m => {
-      const triangleMesh = new Mesh({
-        id: 'triangle1',
-        indices: m.primitives[0].indices,
-        material: defaultMaterial,
-        textures: { color: m.primitives[0].colorTexture },
-        vertecies: m.primitives[0].attributes.POSITION,
-        texCoords: m.primitives[0].attributes.TEXCOORD_0,
-      })
-      triangleMesh.scale = [0.05, 0.05, 0.05]
-
+    const readyMesh = (m: Mesh) => {
       const readyMesh: MeshData[0] = {
-        mesh: triangleMesh,
+        mesh: m,
         verticesBuffer: this._device.createBuffer({
-          size: triangleMesh.vertecies.byteLength,
+          size: m.vertecies.byteLength,
           usage: GPUBufferUsage.VERTEX | GPUBufferUsage.COPY_DST
         }),
         indicesBuffer: this._device.createBuffer({
-          size: triangleMesh.indices.byteLength,
+          size: m.indices.byteLength,
           usage: GPUBufferUsage.INDEX | GPUBufferUsage.COPY_DST
         }),
         texCoordsBuffer: this._device.createBuffer({
-          size: triangleMesh.texCoords.byteLength,
+          size: m.texCoords.byteLength,
           usage: GPUBufferUsage.VERTEX | GPUBufferUsage.COPY_DST
         }),
         textures: {
-          color: m.primitives[0].colorTexture && this._device.createTexture({
+          color: m.textures.color && this._device.createTexture({
             format: 'rgba8unorm',
             usage: GPUTextureUsage.TEXTURE_BINDING |
               GPUTextureUsage.COPY_DST |
               GPUTextureUsage.RENDER_ATTACHMENT,
-            size: [m.primitives[0].colorTexture.image.width, m.primitives[0].colorTexture.image.height, 1]
+            size: [m.textures.color.width, m.textures.color.height, 1]
           })
         },
         samplers: {
-          color: m.primitives[0].colorTexture && this._device.createSampler({
+          color: m.textures.color && this._device.createSampler({
             magFilter: 'linear',
             minFilter: 'linear',
             addressModeU: 'clamp-to-edge',
@@ -283,11 +269,38 @@ export default class Renderer {
         }
       };
 
-      this._device.queue.writeBuffer(readyMesh.indicesBuffer, 0, triangleMesh.indices);
-      this._device.queue.writeBuffer(readyMesh.verticesBuffer, 0, triangleMesh.vertecies);
-      this._device.queue.writeBuffer(readyMesh.texCoordsBuffer, 0, triangleMesh.texCoords);
-      m.primitives[0].colorTexture && this._device.queue.copyExternalImageToTexture({ source: m.primitives[0].colorTexture.image }, { texture: readyMesh.textures.color! }, [m.primitives[0].colorTexture.image.width, m.primitives[0].colorTexture.image.height]);
-      this._meshes.push(readyMesh);
+      this._device.queue.writeBuffer(readyMesh.indicesBuffer, 0, m.indices);
+      this._device.queue.writeBuffer(readyMesh.verticesBuffer, 0, m.vertecies);
+      this._device.queue.writeBuffer(readyMesh.texCoordsBuffer, 0, m.texCoords);
+      m.textures.color && this._device.queue.copyExternalImageToTexture({ source: m.textures.color }, { texture: readyMesh.textures.color! }, [m.textures.color.width, m.textures.color.height]);
+      return readyMesh;
+    }
+
+
+    const t1 = new Mesh({
+      id: 'triangle1',
+      indices: Uint32Array.from([0, 1, 2]),
+      material: defaultMaterial,
+      textures: { color: this._loader.getDefaultTexture() },
+      texCoords: Float32Array.from([0, 0, 0, 1, 1, 1, 0, 0, 0]),
+      vertecies: Float32Array.from([0, 0, 0, 0, 1, 0, 1, 1, 0])
     })
+    t1.scale = [10, 10, 10];
+    const f1 = readyMesh(t1)
+
+    const t2 = new Mesh({
+      id: 'triangle1',
+      indices: Uint32Array.from([0, 1, 2]),
+      material: defaultMaterial,
+      textures: { color: this._loader.getDefaultTexture() },
+      texCoords: Float32Array.from([0, 0, 0, 1, 1, 1, 0, 0, 0]),
+      vertecies: Float32Array.from([0, 0, 2, 0, 1, 2, 1, 1, 2])
+    })
+    t2.scale = [10, 10, 10];
+    const f2 = readyMesh(t2)
+
+    this._meshes.push(f1);
+    this._meshes.push(f2);
+
   }
 }
