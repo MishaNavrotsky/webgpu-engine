@@ -4,9 +4,10 @@ import Material from "./Material"
 export type MeshConstructor = {
   id: string,
   material: Material,
-  textures: Array<Float32Array>,
+  textures: { color?: ArrayBufferLike },
   vertecies: Float32Array,
   indices: Uint32Array,
+  texCoords: Float32Array,
 }
 export default class Mesh {
   private _settings: MeshConstructor;
@@ -27,8 +28,16 @@ export default class Mesh {
     return this._settings.indices;
   }
 
+  get texCoords(): Float32Array {
+    return this._settings.texCoords;
+  }
+
   get material(): Material {
     return this._settings.material;
+  }
+
+  get textures(): MeshConstructor['textures'] {
+    return this._settings.textures;
   }
 
   get modelMatrix() {
@@ -55,7 +64,7 @@ export default class Mesh {
     vec3.copy(this._vScale, v);
   }
 
-  get translate() {
+  get translation() {
     return vec3.clone(this._vTranslate);
   }
 
