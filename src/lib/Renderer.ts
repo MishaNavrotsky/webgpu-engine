@@ -12,7 +12,7 @@ export default class Renderer {
   private _camera: Camera;
   private _loader: Loader;
   private _canvas: HTMLCanvasElement
-  private _fov: number = 90;
+  private _fov: number = 45;
   private _lastCpuTime = 0;
   private _lastGpuTime = 0;
   constructor(camera: Camera, loader: Loader, canvas: HTMLCanvasElement) {

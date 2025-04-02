@@ -13,7 +13,7 @@ class Camera {
 
   private _controls: Controls;
 
-  private _fov: number = 90;
+  private _fov: number = 45;
   private _width: number = 300;
   private _height: number = 300;
 
@@ -59,7 +59,7 @@ class Camera {
     this._width = width;
     this._height = height;
 
-    mat4.perspectiveZO(this._mProjection, glMatrix.toRadian(this._fov), this._width / this._height, 0, Infinity);
+    mat4.perspectiveZO(this._mProjection, glMatrix.toRadian(this._fov), this._width / this._height, 0.1, Infinity);
   }
 
   lookAt(v: vec3) {

@@ -18,7 +18,6 @@ fn vertex_main(@location(0) position: vec4f, @location(1) texCoords: vec2f) -> V
   var output: VertexOut;
   output.position = camera.pvm * position;
   output.texCoords = texCoords;
-  output.position.w += 1;
 
   return output;
 }
