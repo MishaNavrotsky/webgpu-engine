@@ -1,9 +1,15 @@
-import { mat4 } from "gl-matrix";
+import { vec4 } from "gl-matrix";
 import Camera from "./Camera";
 import Loader from "./Loader";
 import Material from "./Material";
 import Mesh from "./Mesh";
 import GLBMesh from "./GLBMesh";
+
+type PointLight = {
+  position: vec4,
+  color: vec4,
+  intensityRadiusZZ: vec4,
+}
 
 type MeshData = Array<{ mesh: Mesh, material: Material }>
 
@@ -70,9 +76,17 @@ export default class Renderer {
         const material = m.material;
 
         const modelMatrix = mesh.modelMatrix;
-        const uniformPVM = mat4.mul(mat4.create(), mPV, modelMatrix)
+        const viewMatrix = this._camera.viewMatrix;
+        const projectionMatrix = this._camera.projectionMatrix;
 
-        this._device.queue.writeBuffer(material.uniformBuffers[0], 0, new Float32Array(uniformPVM));
+        const pointLight: PointLight = {
+          position: [10, 100, 0, 0],
+          color: [5, 1, 1, 0],
+          intensityRadiusZZ: [0.5, 1, 0, 0],
+        }
+
+        this._device.queue.writeBuffer(material.uniformBuffers[0], 0, new Float32Array([...projectionMatrix, ...viewMatrix, ...modelMatrix]));
+        this._device.queue.writeBuffer(material.uniformBuffers[1], 0, new Float32Array([...pointLight.position, ...pointLight.color, ...pointLight.intensityRadiusZZ]));
 
         const renderPipeline = this._device.createRenderPipeline(material.pipelineDescriptor);
 
@@ -195,6 +209,64 @@ export default class Renderer {
 
       const samplers = [colorTextureSampler, normalTextureSampler, emissiveTextureSampler, metalicRoughnessTextureSampler].filter(s => s != undefined);
 
+      const vertexBuffersState = [
+        verticesBuffer && {
+          attributes: [
+            {
+              shaderLocation: 0, // position
+              offset: 0,
+              format: "float32x3",
+            },
+          ],
+          arrayStride: 12,
+          stepMode: "vertex",
+        },
+        texCoordsBuffer && {
+          attributes: [
+            {
+              shaderLocation: 1, // texcoords
+              offset: 0,
+              format: "float32x2",
+            },
+          ],
+          arrayStride: 8,
+          stepMode: "vertex",
+        },
+        normalsBuffer && {
+          attributes: [
+            {
+              shaderLocation: 2, // normals
+              offset: 0,
+              format: "float32x3",
+            },
+          ],
+          arrayStride: 12,
+          stepMode: "vertex",
+        },
+        tangetsBuffer && {
+          attributes: [
+            {
+              shaderLocation: 3, // tangents
+              offset: 0,
+              format: "float32x4",
+            },
+          ],
+          arrayStride: 16,
+          stepMode: "vertex",
+        },
+      ].filter(e => e != undefined);
+
+      const uniformBuffers: GPUBuffer[] = [
+        this._device.createBuffer({
+          size: 4 * 4 * 4 * 3,
+          usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
+        }), //MVP,
+        this._device.createBuffer({
+          size: 4 * 4 + 4 * 4 + 4 * 4, //vec4 + vec4 + vec4
+          usage: GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_DST,
+        }) //point lights
+      ]
+
       const resolveShaderName = (vertexBuffers: GPUBuffer[], textures: GPUTexture[]) => {
         const vbl = vertexBuffers.map(b => b.label[0]);
         const tbl = textures.map(t => t.label[0]);
@@ -209,59 +281,9 @@ export default class Renderer {
         }),
         textures,
         samplers,
-        uniformBuffers: [
-          this._device.createBuffer({
-            size: 4 * 4 * 4,
-            usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
-          })
-        ],
+        uniformBuffers,
         //@ts-ignore
-        vertexBuffersState: [
-          verticesBuffer && {
-            attributes: [
-              {
-                shaderLocation: 0, // position
-                offset: 0,
-                format: "float32x3",
-              },
-            ],
-            arrayStride: 12,
-            stepMode: "vertex",
-          },
-          texCoordsBuffer && {
-            attributes: [
-              {
-                shaderLocation: 1, // texcoords
-                offset: 0,
-                format: "float32x2",
-              },
-            ],
-            arrayStride: 8,
-            stepMode: "vertex",
-          },
-          normalsBuffer && {
-            attributes: [
-              {
-                shaderLocation: 2, // normals
-                offset: 0,
-                format: "float32x3",
-              },
-            ],
-            arrayStride: 12,
-            stepMode: "vertex",
-          },
-          tangetsBuffer && {
-            attributes: [
-              {
-                shaderLocation: 3, // tangents
-                offset: 0,
-                format: "float32x4",
-              },
-            ],
-            arrayStride: 16,
-            stepMode: "vertex",
-          },
-        ].filter(e => e != undefined),
+        vertexBuffersState,
         indicesBuffer,
         vertexBuffers,
       })
