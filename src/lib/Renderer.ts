@@ -5,14 +5,23 @@ import Material from "./Material";
 import Mesh from "./Mesh";
 import GLBMesh from "./GLBMesh";
 
-type MeshData = Array<{ mesh: Mesh, verticesBuffer: GPUBuffer, indicesBuffer: GPUBuffer, texCoordsBuffer: GPUBuffer, textures: { color?: GPUTexture }, samplers: { color?: GPUSampler } }>
+type MeshData = Array<{
+  mesh: Mesh,
+  verticesBuffer: GPUBuffer,
+  indicesBuffer: GPUBuffer,
+  texCoordsBuffer: GPUBuffer,
+  normalsBuffer: GPUBuffer,
+  tangetsBuffer?: GPUBuffer,
+  textures: { color?: GPUTexture, normal?: GPUTexture, emissive?: GPUTexture, metalicRoughness?: GPUTexture },
+  samplers: { color?: GPUSampler, normal?: GPUSampler, emissive?: GPUSampler, metalicRoughness?: GPUSampler },
+}>
 
 export default class Renderer {
   private _meshes: MeshData = [];
   private _camera: Camera;
   private _loader: Loader;
   private _canvas: HTMLCanvasElement
-  private _fov: number = 45;
+  private _fov: number = 90;
   private _lastCpuTime = 0;
   private _lastGpuTime = 0;
   constructor(camera: Camera, loader: Loader, canvas: HTMLCanvasElement) {
@@ -26,6 +35,8 @@ export default class Renderer {
       canvas.height = window.innerHeight;
 
       this._camera.setPerspective(canvas.width, canvas.height, camera.fov)
+
+      this.createDepthTexture();
     });
     resizeObserver.observe(canvas);
   }
@@ -68,6 +79,8 @@ export default class Renderer {
         const verticesBuffer = m.verticesBuffer;
         const indicesBuffer = m.indicesBuffer;
         const texCoordsBuffer = m.texCoordsBuffer;
+        const normalsBuffer = m.normalsBuffer;
+        const tangentsBuffer = m.texCoordsBuffer
 
         const material = mesh.material;
         const modelMatrix = mesh.modelMatrix;
@@ -91,14 +104,25 @@ export default class Renderer {
           {
             attributes: [
               {
-                shaderLocation: 1, // position
+                shaderLocation: 1, // texcoords
                 offset: 0,
                 format: "float32x2",
               },
             ],
             arrayStride: 8,
             stepMode: "vertex",
-          }
+          },
+          {
+            attributes: [
+              {
+                shaderLocation: 2, // normals
+                offset: 0,
+                format: "float32x3",
+              },
+            ],
+            arrayStride: 12,
+            stepMode: "vertex",
+          },
         ];
 
         const pipelineDescriptor: GPURenderPipelineDescriptor = {
@@ -119,7 +143,7 @@ export default class Renderer {
           primitive: {
             topology: "triangle-list",
             frontFace: "ccw",
-            cullMode: 'back'
+            // cullMode: 'back'
           },
           multisample: {
             count: 1,
@@ -158,7 +182,8 @@ export default class Renderer {
         passEncoder.setBindGroup(1, bindGroupTextures);
         passEncoder.setBindGroup(2, bindGroupSampler);
         passEncoder.setVertexBuffer(0, verticesBuffer);
-        passEncoder.setVertexBuffer(1, texCoordsBuffer)
+        passEncoder.setVertexBuffer(1, texCoordsBuffer);
+        passEncoder.setVertexBuffer(2, normalsBuffer);
         passEncoder.setIndexBuffer(indicesBuffer, "uint32");
         passEncoder.drawIndexed(mesh.indices.length)
       }
@@ -174,12 +199,20 @@ export default class Renderer {
     this._lastGpuTime = performance.now() - gpuTimeStart;
   }
 
+  private createDepthTexture() {
+    this._depthTexture = this._device?.createTexture({
+      format: 'depth24plus',
+      size: [this._canvas.width, this._canvas.height],
+      usage: GPUTextureUsage.RENDER_ATTACHMENT,
+      dimension: '2d',
+    });
+    this._depthTextureView = this._depthTexture?.createView();
+  }
+
   private _device!: GPUDevice;
   private _context!: GPUCanvasContext;
   private _depthTexture!: GPUTexture;
   private _depthTextureView!: GPUTextureView;
-  private _depthTextureSampler!: GPUSampler;
-
 
   async initWebGpuCanvasContext() {
     if (!navigator.gpu) {
@@ -198,25 +231,7 @@ export default class Renderer {
       format: navigator.gpu.getPreferredCanvasFormat(),
       alphaMode: "premultiplied",
     });
-    this._depthTexture = this._device.createTexture({
-      format: 'depth24plus',
-      size: [this._canvas.width, this._canvas.height],
-      usage: GPUTextureUsage.RENDER_ATTACHMENT,
-      dimension: '2d',
-    });
-    this._depthTextureView = this._depthTexture.createView();
-    this._depthTextureSampler = this._device.createSampler({
-      addressModeU: 'clamp-to-edge',
-      addressModeV: 'clamp-to-edge',
-      addressModeW: 'clamp-to-edge',
-      magFilter: 'linear',
-      minFilter: 'linear',
-      mipmapFilter: 'nearest',
-      compare: 'less-equal',
-      lodMinClamp: 0,
-      lodMaxClamp: 100,
-    })
-
+    this.createDepthTexture();
 
     const defaultMaterial = new Material({
       id: 'defaultMaterial',
@@ -229,6 +244,42 @@ export default class Renderer {
           size: 4 * 4 * 4,
           usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
         })
+      ],
+      samplers: [],
+      vertexBuffersState: [
+        {
+          attributes: [
+            {
+              shaderLocation: 0, // position
+              offset: 0,
+              format: "float32x3",
+            },
+          ],
+          arrayStride: 12,
+          stepMode: "vertex",
+        },
+        {
+          attributes: [
+            {
+              shaderLocation: 1, // texcoords
+              offset: 0,
+              format: "float32x2",
+            },
+          ],
+          arrayStride: 8,
+          stepMode: "vertex",
+        },
+        {
+          attributes: [
+            {
+              shaderLocation: 2, // normals
+              offset: 0,
+              format: "float32x3",
+            },
+          ],
+          arrayStride: 12,
+          stepMode: "vertex",
+        },
       ]
     })
 
@@ -236,85 +287,92 @@ export default class Renderer {
     const model = await new GLBMesh(await this._loader.getGLB('tyan')!).resolveMeshesToBytes()
 
     const readyMesh = (m: Mesh) => {
+      const createGPUTexture = (i: ImageBitmap) => {
+        return i && this._device.createTexture({
+          format: 'rgba8unorm',
+          usage: GPUTextureUsage.TEXTURE_BINDING |
+            GPUTextureUsage.COPY_DST |
+            GPUTextureUsage.RENDER_ATTACHMENT,
+          size: [m.textures.color.width, m.textures.color.height, 1]
+        })
+      }
+
+      const populateGPUTexture = (i: ImageBitmap | undefined, g: GPUTexture | undefined) => {
+        i && g && this._device.queue.copyExternalImageToTexture({ source: i }, { texture: g }, [i.width, i.height])
+      }
+
+      const createGPUBuffer = (d: Float32Array | Uint32Array | undefined, i: GPUBufferUsageFlags): GPUBuffer | undefined => {
+        return d && this._device.createBuffer({
+          size: d.byteLength,
+          usage: i,
+        })
+      };
+
+      const populateGPUBuffer = (b: GPUBuffer | undefined, d: Float32Array | Uint32Array | undefined) => {
+        d && b && this._device.queue.writeBuffer(b, 0, d);
+      }
+
       const readyMesh: MeshData[0] = {
         mesh: m,
-        verticesBuffer: this._device.createBuffer({
-          size: m.vertecies.byteLength,
-          usage: GPUBufferUsage.VERTEX | GPUBufferUsage.COPY_DST
-        }),
-        indicesBuffer: this._device.createBuffer({
-          size: m.indices.byteLength,
-          usage: GPUBufferUsage.INDEX | GPUBufferUsage.COPY_DST
-        }),
-        texCoordsBuffer: this._device.createBuffer({
-          size: m.texCoords.byteLength,
-          usage: GPUBufferUsage.VERTEX | GPUBufferUsage.COPY_DST
-        }),
+        verticesBuffer: createGPUBuffer(m.vertecies, GPUBufferUsage.VERTEX | GPUBufferUsage.COPY_DST)!,
+        indicesBuffer: createGPUBuffer(m.indices, GPUBufferUsage.INDEX | GPUBufferUsage.COPY_DST)!,
+        texCoordsBuffer: createGPUBuffer(m.texCoords, GPUBufferUsage.VERTEX | GPUBufferUsage.COPY_DST)!,
+        normalsBuffer: createGPUBuffer(m.normals, GPUBufferUsage.VERTEX | GPUBufferUsage.COPY_DST)!,
+        tangetsBuffer: createGPUBuffer(m.tangents, GPUBufferUsage.VERTEX | GPUBufferUsage.COPY_DST),
         textures: {
-          color: m.textures.color && this._device.createTexture({
-            format: 'rgba8unorm',
-            usage: GPUTextureUsage.TEXTURE_BINDING |
-              GPUTextureUsage.COPY_DST |
-              GPUTextureUsage.RENDER_ATTACHMENT,
-            size: [m.textures.color.width, m.textures.color.height, 1]
-          })
+          color: createGPUTexture(m.textures.color),
+          normal: createGPUTexture(m.textures.normal),
+          emissive: createGPUTexture(m.textures.emissive),
+          metalicRoughness: createGPUTexture(m.textures.metalicRoughness),
         },
         samplers: {
-          color: m.textures.color && this._device.createSampler({
-            magFilter: 'linear',
-            minFilter: 'linear',
-            addressModeU: 'clamp-to-edge',
-            addressModeV: 'clamp-to-edge',
-            addressModeW: 'clamp-to-edge',
-            mipmapFilter: 'linear',
-          })
+          color: m.textures.color && this._device.createSampler(m.samplers.color),
+          emissive: m.textures.emissive && this._device.createSampler(m.samplers.emissive),
+          metalicRoughness: m.textures.metalicRoughness && this._device.createSampler(m.samplers.metalicRoughness),
+          normal: m.textures.normal && this._device.createSampler(m.samplers.normal),
         }
       };
 
-      this._device.queue.writeBuffer(readyMesh.indicesBuffer, 0, m.indices);
-      this._device.queue.writeBuffer(readyMesh.verticesBuffer, 0, m.vertecies);
-      this._device.queue.writeBuffer(readyMesh.texCoordsBuffer, 0, m.texCoords);
-      m.textures.color && this._device.queue.copyExternalImageToTexture({ source: m.textures.color }, { texture: readyMesh.textures.color! }, [m.textures.color.width, m.textures.color.height]);
+      populateGPUBuffer(readyMesh.indicesBuffer, m.indices)
+      populateGPUBuffer(readyMesh.verticesBuffer, m.vertecies)
+      populateGPUBuffer(readyMesh.texCoordsBuffer, m.texCoords)
+      populateGPUBuffer(readyMesh.normalsBuffer, m.normals)
+      populateGPUBuffer(readyMesh.tangetsBuffer, m.tangents)
+
+      populateGPUTexture(m.textures.color, readyMesh.textures.color);
+      populateGPUTexture(m.textures.emissive, readyMesh.textures.emissive);
+      populateGPUTexture(m.textures.normal, readyMesh.textures.normal);
+      populateGPUTexture(m.textures.metalicRoughness, readyMesh.textures.metalicRoughness);
+
       return readyMesh;
     }
 
-
-    const t1 = new Mesh({
-      id: 'triangle1',
-      indices: Uint32Array.from([0, 1, 2]),
-      material: defaultMaterial,
-      textures: { color: this._loader.getDefaultTexture() },
-      texCoords: Float32Array.from([0, 0, 0, 1, 1, 1, 0, 0, 0]),
-      vertecies: Float32Array.from([0, 0, 0, 0, 1, 0, 1, 1, 0])
-    })
-    t1.scale = [10, 10, 10];
-    const f1 = readyMesh(t1)
-
-    const t2 = new Mesh({
-      id: 'triangle1',
-      indices: Uint32Array.from([0, 1, 2]),
-      material: defaultMaterial,
-      textures: { color: this._loader.getDefaultTexture() },
-      texCoords: Float32Array.from([0, 0, 0, 1, 1, 1, 0, 0, 0]),
-      vertecies: Float32Array.from([0, 0, 2, 0, 1, 2, 1, 1, 2])
-    })
-    t2.scale = [10, 10, 10];
-    const f2 = readyMesh(t2)
-
-    this._meshes.push(f1);
-    this._meshes.push(f2);
-
     model.forEach(m => {
+      const primitive = m.primitives[0]
       const t = new Mesh({
-        id: 'triangle1',
-        indices: m.primitives[0].indices,
+        id: 'any',
+        indices: primitive.indices,
         material: defaultMaterial,
-        textures: { color: m.primitives[0].colorTexture?.image || this._loader.getDefaultTexture() },
+        textures: {
+          color: primitive.colorTexture?.image || this._loader.getDefaultTexture(),
+          normal: primitive.normalTexture?.image,
+          emissive: primitive.emissiveTexture?.image,
+          metalicRoughness: primitive.metallicRoughnessTexture?.image
+        },
         vertecies: m.primitives[0].attributes.POSITION,
         texCoords: m.primitives[0].attributes.TEXCOORD_0,
+        tangents: m.primitives[0].attributes.TANGENT,
+        normals: m.primitives[0].attributes.NORMAL,
+        samplers: {
+          color: primitive.colorTexture?.sampler || {},
+          normal: primitive.normalTexture?.sampler,
+          emissive: primitive.emissiveTexture?.sampler,
+          metalicRoughness: primitive.metallicRoughnessTexture?.sampler
+        }
       })
-
       t.scale = [0.01, 0.01, 0.01]
+
+      console.log(primitive);
 
       this._meshes.push(readyMesh(t));
     })

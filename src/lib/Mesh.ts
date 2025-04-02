@@ -4,10 +4,13 @@ import Material from "./Material"
 export type MeshConstructor = {
   id: string,
   material: Material,
-  textures: { color: ImageBitmap },
+  textures: { color: ImageBitmap, normal: ImageBitmap, emissive: ImageBitmap, metalicRoughness: ImageBitmap },
+  samplers: { color: GPUSamplerDescriptor, normal: GPUSamplerDescriptor, emissive: GPUSamplerDescriptor, metalicRoughness: GPUSamplerDescriptor },
   vertecies: Float32Array,
   indices: Uint32Array,
   texCoords: Float32Array,
+  normals: Float32Array,
+  tangents: Float32Array,
 }
 export default class Mesh {
   private _settings: MeshConstructor;
@@ -32,12 +35,24 @@ export default class Mesh {
     return this._settings.texCoords;
   }
 
+  get normals(): Float32Array {
+    return this._settings.normals;
+  }
+
+  get tangents(): Float32Array {
+    return this._settings.tangents;
+  }
+
   get material(): Material {
     return this._settings.material;
   }
 
   get textures(): MeshConstructor['textures'] {
     return this._settings.textures;
+  }
+
+  get samplers(): MeshConstructor['samplers'] {
+    return this._settings.samplers;
   }
 
   get modelMatrix() {

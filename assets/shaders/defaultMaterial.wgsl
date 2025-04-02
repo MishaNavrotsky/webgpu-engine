@@ -1,6 +1,7 @@
 struct VertexOut {
   @builtin(position) position: vec4f,
   @location(0) texCoords: vec2f,
+  @location(1) normals: vec3f,
 }
 
 struct Camera {
@@ -14,15 +15,17 @@ struct Camera {
 
 
 @vertex
-fn vertex_main(@location(0) position: vec4f, @location(1) texCoords: vec2f) -> VertexOut {
+fn vertex_main(@location(0) position: vec4f, @location(1) texCoords: vec2f, @location(2) normals: vec3f) -> VertexOut {
   var output: VertexOut;
   output.position = camera.pvm * position;
   output.texCoords = texCoords;
+  output.normals = normals;
 
   return output;
 }
 
 @fragment
 fn fragment_main(fragData: VertexOut) -> @location(0) vec4f {
-  return textureSample(colorTexture, colorSampler, fragData.texCoords.xy);
+  let color = textureSample(colorTexture, colorSampler, fragData.texCoords.xy);
+  return color;
 }

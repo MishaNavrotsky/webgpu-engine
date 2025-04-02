@@ -29,10 +29,24 @@ const ACCESSOR_TYPE_TO_COUNT = {
   MAR4: 16,
 }
 
+const SAMPLER_TO_GPU_SAMPLER_DESCRIPTOR = {
+  9729: 'linear',
+  9728: 'nearest',
+  9986: 'nearest',
+  9987: 'linear',
+  9984: 'nearest',
+  9985: 'linear',
+  10497: 'repeat',
+  33071: 'clamp-to-edge',
+  33648: 'mirror-repeat'
+}
+
 export default class GLBMesh {
   private _rawGLB: GLB;
   constructor(glb: GLB) {
     this._rawGLB = glb;
+
+    console.log(this._rawGLB)
   }
 
   private getAccessor(id: number) {
@@ -67,10 +81,23 @@ export default class GLBMesh {
     return new Type(buffer);
   }
 
-  private async resolveTextureByMaterial(materialId: number) {
+  private resolveSampler(sampler: any): GPUSamplerDescriptor {
+    return {
+      //@ts-ignore
+      magFilter: SAMPLER_TO_GPU_SAMPLER_DESCRIPTOR[sampler.magFilter],
+      //@ts-ignore
+      minFilter: SAMPLER_TO_GPU_SAMPLER_DESCRIPTOR[sampler.minFilter],
+      //@ts-ignore
+      addressModeU: SAMPLER_TO_GPU_SAMPLER_DESCRIPTOR[sampler.wrapS || 10497],
+      //@ts-ignore
+      addressModeV: SAMPLER_TO_GPU_SAMPLER_DESCRIPTOR[sampler.wrapT || 10497],
+    }
+  }
+
+  private async resolveTextureByMaterial(materialId: number, texturePath: string) {
     const material = this.getMaterial(materialId);
     if (!material) return;
-    const textureId = material.pbrMetallicRoughness?.baseColorTexture?.index;
+    const textureId = _.get(material, texturePath);
     if (!textureId) return;
 
 
@@ -90,7 +117,7 @@ export default class GLBMesh {
     const img = document.createElement('img');
     img.src = url;
     await img.decode();
-    return { image: await createImageBitmap(img), sampler }
+    return { image: await createImageBitmap(img), sampler: this.resolveSampler(sampler) }
   }
 
   async resolveMeshesToBytes() {
@@ -101,7 +128,12 @@ export default class GLBMesh {
           p.attributes[k] = this.resolveAccessorBufferData(v as number);
         })
         p.indices = this.resolveAccessorBufferData(p.indices);
-        p.colorTexture = await this.resolveTextureByMaterial(p.material)
+        p.colorTexture = await this.resolveTextureByMaterial(p.material, 'pbrMetallicRoughness.baseColorTexture.index');
+        p.normalTexture = await this.resolveTextureByMaterial(p.material, 'normalTexture.index');
+        p.emissiveTexture = await this.resolveTextureByMaterial(p.material, 'emissiveTexture.index');
+        p.metallicRoughnessTexture = await this.resolveTextureByMaterial(p.material, 'pbrMetallicRoughness.metallicRoughnessTexture.index');
+
+        p.pbr = { ...p.material.pbrMetallicRoughness }
       }
 
       return nm
