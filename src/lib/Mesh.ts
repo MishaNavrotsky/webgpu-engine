@@ -3,7 +3,6 @@ import Material from "./Material"
 
 export type MeshConstructor = {
   id: string,
-  material: Material,
   textures: { color: ImageBitmap, normal: ImageBitmap, emissive: ImageBitmap, metalicRoughness: ImageBitmap },
   samplers: { color: GPUSamplerDescriptor, normal: GPUSamplerDescriptor, emissive: GPUSamplerDescriptor, metalicRoughness: GPUSamplerDescriptor },
   vertecies: Float32Array,
@@ -41,10 +40,6 @@ export default class Mesh {
 
   get tangents(): Float32Array {
     return this._settings.tangents;
-  }
-
-  get material(): Material {
-    return this._settings.material;
   }
 
   get textures(): MeshConstructor['textures'] {
