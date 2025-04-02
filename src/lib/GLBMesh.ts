@@ -98,7 +98,8 @@ export default class GLBMesh {
     const material = this.getMaterial(materialId);
     if (!material) return;
     const textureId = _.get(material, texturePath);
-    if (!textureId) return;
+    if (!_.isNumber(textureId)) return;
+
 
 
     const texture = this._rawGLB.json.textures[textureId];
@@ -132,8 +133,9 @@ export default class GLBMesh {
         p.normalTexture = await this.resolveTextureByMaterial(p.material, 'normalTexture.index');
         p.emissiveTexture = await this.resolveTextureByMaterial(p.material, 'emissiveTexture.index');
         p.metallicRoughnessTexture = await this.resolveTextureByMaterial(p.material, 'pbrMetallicRoughness.metallicRoughnessTexture.index');
+        const material = this.getMaterial(p.material)
 
-        p.pbr = { ...p.material.pbrMetallicRoughness }
+        p.pbr = { ...material.pbrMetallicRoughness }
       }
 
       return nm

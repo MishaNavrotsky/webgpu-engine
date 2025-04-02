@@ -168,37 +168,56 @@ export default class Renderer {
         d && b && this._device.queue.writeBuffer(b, 0, d);
       }
 
-      const verticesBuffer = createGPUBuffer(mesh.vertecies, GPUBufferUsage.VERTEX | GPUBufferUsage.COPY_DST, 'verticesBuffer');
+      const verticesBuffer = createGPUBuffer(mesh.vertecies, GPUBufferUsage.VERTEX | GPUBufferUsage.COPY_DST, 'positionBuffer');
       const indicesBuffer = createGPUBuffer(mesh.indices, GPUBufferUsage.INDEX | GPUBufferUsage.COPY_DST, 'indicesBuffer')!;
       const texCoordsBuffer = createGPUBuffer(mesh.texCoords, GPUBufferUsage.VERTEX | GPUBufferUsage.COPY_DST, 'texCoordsBuffer');
       const normalsBuffer = createGPUBuffer(mesh.normals, GPUBufferUsage.VERTEX | GPUBufferUsage.COPY_DST, 'normalsBuffer')!;
       const tangetsBuffer = createGPUBuffer(mesh.tangents, GPUBufferUsage.VERTEX | GPUBufferUsage.COPY_DST, 'tangetsBuffer');
+
+      const vertexBuffers = [
+        verticesBuffer,
+        texCoordsBuffer,
+        normalsBuffer,
+        tangetsBuffer,
+      ].filter(e => e != undefined);
 
       const colorTexture = createGPUTexture(mesh.textures.color, 'colorTexture');
       const normalTexture = createGPUTexture(mesh.textures.normal, 'normalTexture');
       const emissiveTexture = createGPUTexture(mesh.textures.emissive, 'emissiveTexture');
       const metalicRoughnessTexture = createGPUTexture(mesh.textures.metalicRoughness, 'metalicRoughnessTexture');
 
+      const textures = [colorTexture, normalTexture, emissiveTexture, metalicRoughnessTexture].filter(t => t != undefined);
+
       const colorTextureSampler = colorTexture && this._device.createSampler(mesh.samplers.color);
       const emissiveTextureSampler = emissiveTexture && this._device.createSampler(mesh.samplers.emissive);
       const metalicRoughnessTextureSampler = metalicRoughnessTexture && this._device.createSampler(mesh.samplers.metalicRoughness);
       const normalTextureSampler = normalTexture && this._device.createSampler(mesh.samplers.normal);
 
+      const samplers = [colorTextureSampler, normalTextureSampler, emissiveTextureSampler, metalicRoughnessTextureSampler].filter(s => s != undefined);
+
+      const resolveShaderName = (vertexBuffers: GPUBuffer[], textures: GPUTexture[]) => {
+        const vbl = vertexBuffers.map(b => b.label[0]);
+        const tbl = textures.map(t => t.label[0]);
+
+        return `${vbl.join('')}_${tbl.join('')}_material`
+      }
+
       const material = new Material({
         id: 'any',
         shaderModule: this._device.createShaderModule({
-          code: this._loader.getShader('defaultMaterial')!,
+          code: this._loader.getShader(resolveShaderName(vertexBuffers, textures))!,
         }),
-        textures: [colorTexture, normalTexture, emissiveTexture, metalicRoughnessTexture].filter(t => t != undefined),
-        samplers: [colorTextureSampler, normalTextureSampler, emissiveTextureSampler, metalicRoughnessTextureSampler].filter(s => s != undefined),
+        textures,
+        samplers,
         uniformBuffers: [
           this._device.createBuffer({
             size: 4 * 4 * 4,
             usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
           })
         ],
+        //@ts-ignore
         vertexBuffersState: [
-          {
+          verticesBuffer && {
             attributes: [
               {
                 shaderLocation: 0, // position
@@ -209,7 +228,7 @@ export default class Renderer {
             arrayStride: 12,
             stepMode: "vertex",
           },
-          {
+          texCoordsBuffer && {
             attributes: [
               {
                 shaderLocation: 1, // texcoords
@@ -220,7 +239,7 @@ export default class Renderer {
             arrayStride: 8,
             stepMode: "vertex",
           },
-          {
+          normalsBuffer && {
             attributes: [
               {
                 shaderLocation: 2, // normals
@@ -231,10 +250,10 @@ export default class Renderer {
             arrayStride: 12,
             stepMode: "vertex",
           },
-          {
+          tangetsBuffer && {
             attributes: [
               {
-                shaderLocation: 3, // normals
+                shaderLocation: 3, // tangents
                 offset: 0,
                 format: "float32x4",
               },
@@ -242,14 +261,9 @@ export default class Renderer {
             arrayStride: 16,
             stepMode: "vertex",
           },
-        ],
+        ].filter(e => e != undefined),
         indicesBuffer,
-        vertexBuffers: [
-          verticesBuffer,
-          texCoordsBuffer,
-          normalsBuffer,
-          tangetsBuffer,
-        ].filter(e => e != undefined)
+        vertexBuffers,
       })
 
       populateGPUBuffer(indicesBuffer, mesh.indices)
@@ -266,7 +280,7 @@ export default class Renderer {
       return material;
     }
 
-    [model[1]].forEach(m => {
+    model.forEach(m => {
       const primitive = m.primitives[0]
       const t = new Mesh({
         id: 'any',
