@@ -4,6 +4,7 @@ import Loader from "./Loader";
 import Material from "./Material";
 import Mesh from "./Mesh";
 import GLBMesh from "./GLBMesh";
+import UI from "@/ui";
 
 type PointLight = {
   position: vec4,
@@ -21,6 +22,7 @@ export default class Renderer {
   private _fov: number = 90;
   private _lastCpuTime = 0;
   private _lastGpuTime = 0;
+  private _ui: UI | undefined;
   constructor(camera: Camera, loader: Loader, canvas: HTMLCanvasElement) {
     this._canvas = canvas;
     this._loader = loader;
@@ -42,12 +44,16 @@ export default class Renderer {
     return { cpu: this._lastCpuTime, gpu: this._lastGpuTime }
   }
 
+  setUI(ui: UI) {
+    this._ui = ui;
+  }
+
 
 
   async render(dT: number) {
     const cpuTimeStart = performance.now()
     {
-      const mPV = this._camera.calculate(dT);
+      this._camera.calculate(dT);
 
 
       const renderPassDescriptor: GPURenderPassDescriptor = {
@@ -79,11 +85,7 @@ export default class Renderer {
         const viewMatrix = this._camera.viewMatrix;
         const projectionMatrix = this._camera.projectionMatrix;
 
-        const pointLight: PointLight = {
-          position: [10, 100, 0, 0],
-          color: [5, 1, 1, 0],
-          intensityRadiusZZ: [0.5, 1, 0, 0],
-        }
+        const pointLight: PointLight = this._ui?.lightsInfo!;
 
         this._device.queue.writeBuffer(material.uniformBuffers[0], 0, new Float32Array([...projectionMatrix, ...viewMatrix, ...modelMatrix]));
         this._device.queue.writeBuffer(material.uniformBuffers[1], 0, new Float32Array([...pointLight.position, ...pointLight.color, ...pointLight.intensityRadiusZZ]));
@@ -278,6 +280,7 @@ export default class Renderer {
         id: 'any',
         shaderModule: this._device.createShaderModule({
           code: this._loader.getShader(resolveShaderName(vertexBuffers, textures))!,
+          label: resolveShaderName(vertexBuffers, textures),
         }),
         textures,
         samplers,
@@ -324,7 +327,7 @@ export default class Renderer {
           metalicRoughness: primitive.metallicRoughnessTexture?.sampler
         }
       })
-      t.scale = [0.01, 0.01, 0.01]
+      // t.scale = [0.01, 0.01, 0.01]
 
       const r = { mesh: t, material: readyMaterial(t) }
       console.log(r);

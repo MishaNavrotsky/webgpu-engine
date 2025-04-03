@@ -3,7 +3,7 @@ import Camera from "@/lib/Camera";
 import Controls from "@/lib/Controls";
 import Loader from "@/lib/Loader";
 import Renderer from "@/lib/Renderer";
-import { vec3toXYZ, XYZtoVec3 } from '@/utils/vec3utils';
+import { vec3toXYZ, XYZtoVec3, XYZWtoVec4 } from '@/utils/vec3utils';
 import Engine from '@/lib/Engine';
 
 export type UIConstructor = {
@@ -18,6 +18,7 @@ export default class UI {
   private _pane: Pane | undefined;
   private _frameFolder: FolderApi | undefined;
   private _cameraFolder: FolderApi | undefined;
+  private _lightFolder: FolderApi | undefined;
   private _settings: UIConstructor;
   private _cameraControls = {
     width: 0,
@@ -42,6 +43,12 @@ export default class UI {
     fps: 0,
     gpu_time: 0,
     cpu_time: 0,
+  }
+
+  private _lightInfo = {
+    position: { x: 0, y: 28, z: 161, w: 0 },
+    color: { x: 0, y: 0, z: 0, w: 0 },
+    intensityRadiusZZ: { x: 0.5, y: 0, z: 0, w: 0 },
   }
   constructor(settings: UIConstructor) {
     this._settings = settings;
@@ -70,11 +77,27 @@ export default class UI {
       title: 'Camera'
     })
 
-    this._cameraFolder.on('change', (e) => { })
 
     Object.entries(this._cameraControls).forEach(([k, v]) => {
       this._cameraFolder?.addBinding(this._cameraControls, k as any, this._cameraControlsSettings[k])
     })
+
+    this._lightFolder = this._pane.addFolder({
+      title: 'Light'
+    })
+
+
+    Object.entries(this._lightInfo).forEach(([k, v]) => {
+      this._lightFolder?.addBinding(this._lightInfo, k as any)
+    })
+  }
+
+  get lightsInfo() {
+    return {
+      position: XYZWtoVec4(this._lightInfo.position),
+      color: XYZWtoVec4(this._lightInfo.color),
+      intensityRadiusZZ: XYZWtoVec4(this._lightInfo.intensityRadiusZZ),
+    };
   }
 
   private refreshCamera() {

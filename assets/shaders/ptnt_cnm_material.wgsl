@@ -2,8 +2,9 @@ struct VertexOut {
   @builtin(position) position: vec4f,
   @location(0) texCoords: vec2f,
   @location(1) normals: vec3f,
-  @location(2) tangents: vec4f,
-  @location(3) worldPosition: vec3f,
+  @location(2) tangents: vec3f,
+  @location(3) bitangents: vec3f,
+  @location(4) worldPosition: vec3f,
 }
 
 struct Camera {
@@ -35,7 +36,8 @@ fn vertex_main(@location(0) position: vec4f, @location(1) texCoords: vec2f, @loc
   out.position = camera.projection * camera.view * camera.model * position;
   out.texCoords = texCoords;
   out.normals = normals;
-  out.tangents = tangents;
+  out.tangents = tangents.xyz;
+  out.bitangents = tangents.w * cross(out.normals, out.tangents);
 
   var vertexWorldPosition = camera.model * position;
   out.worldPosition = vertexWorldPosition.xyz;
@@ -46,13 +48,23 @@ fn vertex_main(@location(0) position: vec4f, @location(1) texCoords: vec2f, @loc
 @fragment
 fn fragment_main(in: VertexOut) -> @location(0) vec4f {
   var color = textureSample(colorTexture, colorSampler, in.texCoords.xy);
-  var normalSample = textureSample(normalTexture, normalSampler, in.normals.xy);
+  var normalSample = textureSample(normalTexture, normalSampler, in.texCoords.xy);  
   var metalicRoughness = textureSample(metalicRoughnessTexture, metalicRoughnessSampler, in.texCoords.xy);
 
+  var T = normalize((camera.model * vec4(in.tangents,   0.0)).xyz);
+  var B = normalize((camera.model * vec4(in.bitangents, 0.0)).xyz);
+  var N = normalize((camera.model * vec4(in.normals,    0.0)).xyz);
+  var TBN = mat3x3f(T, B, N);
+
   for(var i: u32 = 0; i < arrayLength(&pointLights); i++) {
-    let lightDist = dot(-normalSample.xyz, normalize(pointLights[i].worldPosition.xyz - in.worldPosition)) * pointLights[i].intensityRadiusZZ.x;
+    var lightPos = pointLights[i].worldPosition.xyz;
+    var s = normalSample.xyz * 2 - 1;
+    var d = normalize(TBN * s);
+
+    let lightDist = dot(d, -normalize(in.worldPosition - pointLights[i].worldPosition.xyz)) * pointLights[i].intensityRadiusZZ.x;
 
     color *= lightDist;
+
   }
 
   return color;

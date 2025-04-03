@@ -21,6 +21,7 @@ export default class Engine {
   async start() {
     this._controls.subscribe();
     await this._loader.loadShader('shader', '/assets/shaders/main.wgsl');
+    await this._loader.loadShader('ptn__material', '/assets/shaders/ptn__material.wgsl');
     await this._loader.loadShader('ptn_c_material', '/assets/shaders/ptn_c_material.wgsl');
     await this._loader.loadShader('ptn_ce_material', '/assets/shaders/ptn_ce_material.wgsl');
     await this._loader.loadShader('ptn_cm_material', '/assets/shaders/ptn_cm_material.wgsl');
@@ -34,6 +35,8 @@ export default class Engine {
 
 
     await this._loader.loadGLB('tyan', '/assets/models/alicev2rigged.glb');
+    await this._loader.loadGLB('hand', '/assets/models/hand_low_poly.glb');
+
     await this._renderer.initWebGpuCanvasContext();
 
     const repeat = () => requestAnimationFrame(async () => { await this.mainLoop(); repeat() })
@@ -43,6 +46,8 @@ export default class Engine {
   setUI(ui: UI) {
     this._ui = ui;
     ui.init();
+
+    this._renderer.setUI(this._ui);
   }
 
 

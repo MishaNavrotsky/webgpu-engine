@@ -1,4 +1,4 @@
-import { DEPTH_STENCIL_FORMAT, MULTISAMPLE_COUNT } from "@/CONSTANTS";
+import { DEPTH_STENCIL_FORMAT, MULTISAMPLE_COUNT } from "@/constants";
 
 export type MaterialConstructor = {
   id: string,
@@ -52,7 +52,7 @@ export default class Material {
       primitive: {
         topology: "triangle-list",
         frontFace: "ccw",
-        // cullMode: 'back'
+        cullMode: 'back'
       },
       multisample: {
         count: MULTISAMPLE_COUNT,
@@ -113,6 +113,7 @@ export default class Material {
         })
       }
     }
+
     return [bindGroupDescriptorUniforms, bindGroupDescriptorTextures, bindGroupDescriptorSampler].filter(e => e != 0)
   }
 

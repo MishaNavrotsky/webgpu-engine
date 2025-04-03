@@ -44,10 +44,11 @@ fn fragment_main(in: VertexOut) -> @location(0) vec4f {
   var metalicRoughness = textureSample(metalicRoughnessTexture, metalicRoughnessSampler, in.texCoords.xy);
 
   for(var i: u32 = 0; i < arrayLength(&pointLights); i++) {
-    let lightDist = dot(-in.normals.xyz, normalize(pointLights[i].worldPosition.xyz - in.worldPosition)) * pointLights[i].intensityRadiusZZ.x;
+    let lightDist = dot(in.normals.xyz, -normalize(in.worldPosition - pointLights[i].worldPosition.xyz)) * pointLights[i].intensityRadiusZZ.x;
 
     color *= lightDist;
   }
+  // return vec4(1,0,0,1);
 
   return color;
 }
