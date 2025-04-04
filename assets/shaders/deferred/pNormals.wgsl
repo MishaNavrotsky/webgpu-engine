@@ -11,8 +11,8 @@ struct Camera {
 
 @group(0) @binding(0) var<uniform> camera: Camera;
 
-@group(1) @binding(0) var colorTexture : texture_2d<f32>;
-@group(2) @binding(0) var colorSampler : sampler;
+@group(1) @binding(0) var normalTexture : texture_2d<f32>;
+@group(2) @binding(0) var normalTextureSampler : sampler;
 
 @vertex
 fn vertex_main(@location(0) position: vec4f, @location(1) texCoords: vec2f) -> VertexOut {
@@ -25,7 +25,7 @@ fn vertex_main(@location(0) position: vec4f, @location(1) texCoords: vec2f) -> V
 
 @fragment
 fn fragment_main(in: VertexOut) -> @location(0) vec4f {
-  var color = textureSample(colorTexture, colorSampler, in.texCoords.xy);
+  var normals = textureSample(normalTexture, normalTextureSampler, in.texCoords.xy);
 
-  return color;
+  return normals;
 }

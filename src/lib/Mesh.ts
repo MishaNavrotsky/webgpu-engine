@@ -89,4 +89,8 @@ export default class Mesh {
   get scale() {
     return vec3.clone(this._vScale);
   }
+
+  get id() {
+    return this._settings.id;
+  }
 }

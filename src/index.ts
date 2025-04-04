@@ -4,6 +4,7 @@ import Loader from "./lib/Loader";
 import Engine from "./lib/Engine";
 import Renderer from "./lib/Renderer";
 import UI from "./ui";
+import Scene from "./lib/Scene";
 
 const canvas = document.getElementsByTagName('canvas')[0];
 canvas.addEventListener('click', async () => {
@@ -332,8 +333,9 @@ async function init() {
   await loader.init();
   const controls = new Controls();
   const camera = new Camera(controls)
-  const renderer = new Renderer(camera, loader, canvas);
-  const engine = new Engine({ renderer, loader, controls });
+  const scene = new Scene();
+  const renderer = new Renderer({ camera, loader, canvas });
+  const engine = new Engine({ renderer, loader, controls, scene });
   const ui = new UI({
     loader, camera, controls, renderer, engine
   });

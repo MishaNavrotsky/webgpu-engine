@@ -151,10 +151,10 @@ class Camera {
     this._vTranslate = p;
   }
 
-  calculate(dT: number): mat4 {
+  calculate(dT: number, clear?: boolean): mat4 {
     this.calculateRotation(dT);
     this.calculatePosition(dT);
-    this._controls.clearDeltaMouse();
+    clear && this._controls.clearDeltaMouse();
 
     return this.PVMatrix;
   }
