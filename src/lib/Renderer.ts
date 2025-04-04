@@ -45,6 +45,7 @@ export default class Renderer {
   private _lastCpuTime = 0;
   private _lastGpuTime = 0;
   private _ui: UI | undefined;
+  private _callbackToDoBeforeRender: CallableFunction = () => { };
   constructor(settings: RendererConstructor) {
     this._canvas = settings.canvas;
     this._loader = settings.loader;
@@ -57,7 +58,14 @@ export default class Renderer {
 
       this._camera.setPerspective(settings.canvas.width, settings.canvas.height, settings.camera.fov)
 
-      this.createDepthTexture();
+      this._callbackToDoBeforeRender = () => {
+        this.createDepthTexture();
+        this.createDeferredDepthTexture();
+        this.createTexturesForDPassPrepObj();
+        this.createRenderPassDescriptorsForDPassPrepObj()
+
+        this._callbackToDoBeforeRender = () => { }
+      }
     });
     resizeObserver.observe(settings.canvas);
   }
@@ -92,6 +100,7 @@ export default class Renderer {
   }
 
   async render(dT: number) {
+    this._callbackToDoBeforeRender();
     const cpuTimeStart = performance.now()
     {
       this._camera.calculate(dT, true);
@@ -140,7 +149,7 @@ export default class Renderer {
   private _dPassPrepObj!: DPassPrepObj;
 
   private createTexturesForDPassPrepObj() {
-    Object.entries(this._dPassPrepObj).forEach(([_, o]) => {
+    Object.entries(this._dPassPrepObj || {}).forEach(([_, o]) => {
       o.texture && o.texture.destroy()
       o.texture = this._device.createTexture({
         format: D_PASS_TEXTURE_FORMAT,
