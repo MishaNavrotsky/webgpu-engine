@@ -1,7 +1,7 @@
 import { vec4 } from "gl-matrix";
 import Camera from "./Camera";
 import Loader from "./Loader";
-import Material from "./Material";
+import Material, { MaterialConstructor } from "./Material";
 import Mesh from "./Mesh";
 import UI from "@/ui";
 import VBSG from "./VertexBuffersStateGenerator";
@@ -14,7 +14,7 @@ type PointLight = {
   intensityRadiusZZ: vec4,
 }
 
-type MeshData = Array<{ mesh: Mesh, material: Material, renderPipeline: GPURenderPipeline }>
+type MeshData = Array<{ mesh: Mesh, material: Material, renderPipeline: GPURenderPipeline, type?: 'forward' | 'deferred' }>
 
 const D_PASSES = ['deferred/albdeo', 'deferred/emissive', 'deferred/metalicRoughness', 'deferred/pNormals', 'deferred/position', 'deferred/vBiTangents', 'deferred/vNormals', 'deferred/vTangents'] as const;
 type DPassName = typeof D_PASSES[number];
@@ -46,6 +46,15 @@ export default class Renderer {
   private _lastGpuTime = 0;
   private _ui: UI | undefined;
   private _callbackToDoBeforeRender: CallableFunction = () => { };
+
+  private _device!: GPUDevice;
+  private _context!: GPUCanvasContext;
+
+  private _depthTexture!: GPUTexture;
+  private _depthTextureView!: GPUTextureView;
+  private _deferredDepthTexture!: GPUTexture;
+  private _deferredDepthTextureView!: GPUTextureView;
+
   constructor(settings: RendererConstructor) {
     this._canvas = settings.canvas;
     this._loader = settings.loader;
@@ -97,6 +106,70 @@ export default class Renderer {
     });
     this.createDepthTexture();
     this.createDeferredDepthTexture();
+
+    Material.setContext(this._device);
+  }
+  private _deferredRendererMesh!: { mesh: Mesh, material: Material }
+
+  private async prepareMeshForGBuffers() {
+    const gbuffers = Object.values(this._dPassPrepObj).map(v => v.texture) as GPUTexture[];
+    const quadMesh = new Mesh({
+      id: 'full-screen',
+      indices: new Uint32Array([0, 1, 2, 2, 3, 0]),
+      vertecies: new Float32Array([
+        -1, -1, 0,
+        -1, 1, 0,
+        1, 1, 0,
+        1, -1, 0
+      ]),
+      texCoords: new Float32Array([0, 0, 0]),
+    });
+    const material = new Material({
+      id: 'full-screen',
+      indicesBuffer: this._device.createBuffer({
+        size: quadMesh.indices.byteLength,
+        usage: GPUBufferUsage.COPY_DST | GPUBufferUsage.INDEX,
+        label: 'full-screen-indices-buffer'
+      }),
+      samplers: [],
+      shaderModule: this._device.createShaderModule({
+        code: this._loader.getShader('deferred/main')!
+      }),
+      textures: gbuffers,
+      uniformBuffers: [
+        this._device.createBuffer({
+          size: 4 * 4 * 4 * 3,
+          usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
+          label: UNIFORM_BUFFER_IDS.camera,
+        }), //MVP,
+        this._device.createBuffer({
+          size: 4 * 4 + 4 * 4 + 4 * 4, //vec4 + vec4 + vec4
+          usage: GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_DST,
+          label: UNIFORM_BUFFER_IDS.pointLights
+        }) //point lights
+      ],
+      vertexBuffers: [
+        this._device.createBuffer({
+          size: quadMesh.vertecies.byteLength,
+          usage: GPUBufferUsage.COPY_DST | GPUBufferUsage.VERTEX
+        }),
+        this._device.createBuffer({
+          size: quadMesh.texCoords!.byteLength,
+          usage: GPUBufferUsage.COPY_DST | GPUBufferUsage.VERTEX
+        })
+      ],
+      vertexBuffersState: new VBSG()
+        .add(VERTEX_BUFFER_IDS.positionBuffer, { format: 'float32x3' }, false)
+        .add(VERTEX_BUFFER_IDS.texCoordsBuffer, { format: 'float32x2' }, false)
+        .end(),
+    })
+
+    this._device.queue.writeBuffer(material.vertexBuffers[0], 0, quadMesh.vertecies);
+    this._device.queue.writeBuffer(material.vertexBuffers[1], 0, quadMesh.texCoords!);
+    this._device.queue.writeBuffer(material.indicesBuffer!, 0, quadMesh.indices);
+
+    this._deferredRendererMesh = { mesh: quadMesh, material };
+    this._meshes.push({ ...this._deferredRendererMesh, type: 'forward', renderPipeline: this._device.createRenderPipeline(material.pipelineDescriptor) })
   }
 
   async render(dT: number) {
@@ -105,6 +178,7 @@ export default class Renderer {
     {
       this._camera.calculate(dT, true);
       await this.renderGBuffers();
+      this._deferredRendererMesh.material.swapTextures(Object.values(this._dPassPrepObj).map(v => v.texture) as GPUTexture[]);
       await this.forwardRender();
     }
     this._lastCpuTime = performance.now() - cpuTimeStart;
@@ -115,6 +189,7 @@ export default class Renderer {
   }
 
   private createDepthTexture() {
+    this._deferredDepthTexture && this._depthTexture.destroy();
     this._depthTexture = this._device?.createTexture({
       format: 'depth24plus',
       size: [this._canvas.width, this._canvas.height],
@@ -134,17 +209,6 @@ export default class Renderer {
     this._deferredDepthTextureView = this._deferredDepthTexture?.createView();
   }
 
-  private _device!: GPUDevice;
-  private _context!: GPUCanvasContext;
-
-  private _depthTexture!: GPUTexture;
-  private _depthTextureView!: GPUTextureView;
-  private _deferredDepthTexture!: GPUTexture;
-  private _deferredDepthTextureView!: GPUTextureView;
-
-
-
-
   private _passes = ['deferred/albdeo', 'deferred/emissive', 'deferred/metalicRoughness', 'deferred/pNormals', 'deferred/position', 'deferred/vBiTangents', 'deferred/vNormals', 'deferred/vTangents'] as const;
   private _dPassPrepObj!: DPassPrepObj;
 
@@ -152,6 +216,7 @@ export default class Renderer {
     Object.entries(this._dPassPrepObj || {}).forEach(([_, o]) => {
       o.texture && o.texture.destroy()
       o.texture = this._device.createTexture({
+        label: _,
         format: D_PASS_TEXTURE_FORMAT,
         size: [this._canvas.width, this._canvas.height, 1],
         usage: GPUTextureUsage.TEXTURE_BINDING |
@@ -189,7 +254,7 @@ export default class Renderer {
       ppo.renderPassDescriptor = cloneDeep(defDesc);
       //@ts-ignore
       ppo.renderPassDescriptor!.colorAttachments[0].view = ppo.texture!.createView()
-      ppo.renderPassDescriptor!.depthStencilAttachment!.depthStoreOp = 'discard'
+      ppo.renderPassDescriptor!.depthStencilAttachment!.depthStoreOp = 'store'
       ppo.renderPassDescriptor!.depthStencilAttachment!.depthLoadOp = 'load'
     }
   }
@@ -234,8 +299,8 @@ export default class Renderer {
             .end(),
           fragmentFormat: D_PASS_TEXTURE_FORMAT
         }),
-        requiredTexture: TEXTURE_IDS.colorTexture,
-        requiredSampler: TEXTURE_SAMPLERS_IDS.colorSampler,
+        requiredTexture: TEXTURE_IDS.emissiveTexture,
+        requiredSampler: TEXTURE_SAMPLERS_IDS.emissiveSampler,
       },
       "deferred/metalicRoughness": {
         material: new Material({
@@ -349,8 +414,7 @@ export default class Renderer {
 
     this.createTexturesForDPassPrepObj();
     this.createRenderPassDescriptorsForDPassPrepObj();
-
-    console.log(this._dPassPrepObj);
+    this.prepareMeshForGBuffers();
   }
 
   private async renderGBuffers() {
@@ -399,23 +463,6 @@ export default class Renderer {
     return this._device.queue.submit([encoder.finish()]);
   }
 
-  private renderMesh(mesh: Mesh, material: Material, renderPipeline: GPURenderPipeline, passEncoder: GPURenderPassEncoder) {
-    const bindGroupsDescriptors = material.getBindGroupsDescriptors(renderPipeline);
-    const bindGroups = bindGroupsDescriptors.map(desc => {
-      return this._device.createBindGroup(desc.description)
-    })
-
-    passEncoder.setPipeline(renderPipeline);
-    bindGroupsDescriptors.forEach(desc => {
-      passEncoder.setBindGroup(desc.index, bindGroups[desc.index])
-    })
-    material.vertexBuffers.forEach((b, i) => {
-      passEncoder.setVertexBuffer(i, b);
-    })
-    passEncoder.setIndexBuffer(material.indicesBuffer!, "uint32");
-    passEncoder.drawIndexed(mesh.indices.length)
-  }
-
   private async forwardRender() {
     const renderPassDescriptor: GPURenderPassDescriptor = {
       colorAttachments: [
@@ -439,6 +486,7 @@ export default class Renderer {
 
 
     for (const m of this._meshes) {
+      if (m.type === 'forward') continue;
       const mesh = m.mesh;
       const material = m.material;
 
@@ -461,14 +509,31 @@ export default class Renderer {
     this._device.queue.submit([encoder.finish()]);
   }
 
-  private _generateMaterial(mesh: Mesh): Material {
+  private renderMesh(mesh: Mesh, material: Material, renderPipeline: GPURenderPipeline, passEncoder: GPURenderPassEncoder) {
+    const bindGroupsDescriptors = material.getBindGroupsDescriptors(renderPipeline);
+    const bindGroups = bindGroupsDescriptors.map(desc => {
+      return this._device.createBindGroup(desc.description)
+    })
+
+    passEncoder.setPipeline(renderPipeline);
+    bindGroupsDescriptors.forEach(desc => {
+      passEncoder.setBindGroup(desc.index, bindGroups[desc.index])
+    })
+    material.vertexBuffers.forEach((b, i) => {
+      passEncoder.setVertexBuffer(i, b);
+    })
+    passEncoder.setIndexBuffer(material.indicesBuffer!, "uint32");
+    passEncoder.drawIndexed(mesh.indices.length)
+  }
+
+  private _generateMaterialSettings(mesh: Mesh): MaterialConstructor {
     const createGPUTexture = (i: ImageBitmap, label: string): GPUTexture | undefined => {
       return i && this._device.createTexture({
         format: 'rgba8unorm',
         usage: GPUTextureUsage.TEXTURE_BINDING |
           GPUTextureUsage.COPY_DST |
           GPUTextureUsage.RENDER_ATTACHMENT,
-        size: [mesh.textures.color.width, mesh.textures.color.height, 1],
+        size: [mesh.textures!.color.width, mesh.textures!.color.height, 1],
         label
       })
     }
@@ -502,17 +567,17 @@ export default class Renderer {
       tangetsBuffer,
     ].filter(e => e != undefined);
 
-    const colorTexture = createGPUTexture(mesh.textures.color, 'colorTexture');
-    const normalTexture = createGPUTexture(mesh.textures.normal, 'normalTexture');
-    const emissiveTexture = createGPUTexture(mesh.textures.emissive, 'emissiveTexture');
-    const metalicRoughnessTexture = createGPUTexture(mesh.textures.metalicRoughness, 'metalicRoughnessTexture');
+    const colorTexture = createGPUTexture(mesh.textures!.color, 'colorTexture');
+    const normalTexture = createGPUTexture(mesh.textures!.normal, 'normalTexture');
+    const emissiveTexture = createGPUTexture(mesh.textures!.emissive, 'emissiveTexture');
+    const metalicRoughnessTexture = createGPUTexture(mesh.textures!.metalicRoughness, 'metalicRoughnessTexture');
 
     const textures = [colorTexture, normalTexture, emissiveTexture, metalicRoughnessTexture].filter(t => t != undefined);
 
-    const colorTextureSampler = colorTexture && this._device.createSampler({ ...mesh.samplers.color, label: TEXTURE_SAMPLERS_IDS.colorSampler });
-    const emissiveTextureSampler = emissiveTexture && this._device.createSampler({ ...mesh.samplers.emissive, label: TEXTURE_SAMPLERS_IDS.emissiveSampler });
-    const metalicRoughnessTextureSampler = metalicRoughnessTexture && this._device.createSampler({ ...mesh.samplers.metalicRoughness, label: TEXTURE_SAMPLERS_IDS.metalicRoughnessSampler });
-    const normalTextureSampler = normalTexture && this._device.createSampler({ ...mesh.samplers.normal, label: TEXTURE_SAMPLERS_IDS.normalSampler });
+    const colorTextureSampler = colorTexture && this._device.createSampler({ ...mesh.samplers!.color, label: TEXTURE_SAMPLERS_IDS.colorSampler });
+    const emissiveTextureSampler = emissiveTexture && this._device.createSampler({ ...mesh.samplers!.emissive, label: TEXTURE_SAMPLERS_IDS.emissiveSampler });
+    const metalicRoughnessTextureSampler = metalicRoughnessTexture && this._device.createSampler({ ...mesh.samplers!.metalicRoughness, label: TEXTURE_SAMPLERS_IDS.metalicRoughnessSampler });
+    const normalTextureSampler = normalTexture && this._device.createSampler({ ...mesh.samplers!.normal, label: TEXTURE_SAMPLERS_IDS.normalSampler });
 
     const samplers = [colorTextureSampler, normalTextureSampler, emissiveTextureSampler, metalicRoughnessTextureSampler].filter(s => s != undefined);
 
@@ -533,29 +598,15 @@ export default class Renderer {
         size: 4 * 4 + 4 * 4 + 4 * 4, //vec4 + vec4 + vec4
         usage: GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_DST,
         label: UNIFORM_BUFFER_IDS.pointLights
-      }) //point lights
+      }), //point lights
+      this._device.createBuffer({
+        size: 4 + 4 + 4 + 4,
+        usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
+        label: UNIFORM_BUFFER_IDS.settings,
+      }) //settings
     ]
 
-    const resolveShaderName = (vertexBuffers: GPUBuffer[], textures: GPUTexture[]) => {
-      const vbl = vertexBuffers.map(b => b.label[0]);
-      const tbl = textures.map(t => t.label[0]);
-
-      return `${vbl.join('')}_${tbl.join('')}_material`
-    }
-
-    const material = new Material({
-      id: 'any',
-      shaderModule: this._device.createShaderModule({
-        code: this._loader.getShader(resolveShaderName(vertexBuffers, textures))!,
-        label: resolveShaderName(vertexBuffers, textures),
-      }),
-      textures,
-      samplers,
-      uniformBuffers,
-      vertexBuffersState,
-      indicesBuffer,
-      vertexBuffers,
-    })
+    this._device.queue.writeBuffer(uniformBuffers[2], 0, new Uint32Array([!colorTexture ? 1 : 0, !normalTexture ? 1 : 0, !emissiveTexture ? 1 : 0, !metalicRoughnessTexture ? 1 : 0]))
 
     populateGPUBuffer(indicesBuffer, mesh.indices)
     populateGPUBuffer(verticesBuffer, mesh.vertecies)
@@ -563,12 +614,26 @@ export default class Renderer {
     populateGPUBuffer(normalsBuffer, mesh.normals)
     populateGPUBuffer(tangetsBuffer, mesh.tangents)
 
-    populateGPUTexture(mesh.textures.color, colorTexture);
-    populateGPUTexture(mesh.textures.emissive, emissiveTexture);
-    populateGPUTexture(mesh.textures.normal, normalTexture);
-    populateGPUTexture(mesh.textures.metalicRoughness, metalicRoughnessTexture);
+    populateGPUTexture(mesh.textures!.color, colorTexture);
+    populateGPUTexture(mesh.textures!.emissive, emissiveTexture);
+    populateGPUTexture(mesh.textures!.normal, normalTexture);
+    populateGPUTexture(mesh.textures!.metalicRoughness, metalicRoughnessTexture);
 
-    return material;
+    const materialSettings: MaterialConstructor = {
+      id: 'any',
+      shaderModule: this._device.createShaderModule({
+        code: this._loader.getShader('main')!,
+        label: 'main',
+      }),
+      textures,
+      samplers,
+      uniformBuffers,
+      vertexBuffersState,
+      indicesBuffer,
+      vertexBuffers,
+    }
+
+    return materialSettings;
   }
 
   async initForwardRender() {
@@ -577,9 +642,15 @@ export default class Renderer {
 
   async prepareMeshes(meshes: Mesh[]) {
     meshes.forEach(mesh => {
-      const material = this._generateMaterial(mesh);
+      const settings = this._generateMaterialSettings(mesh);
+      const material = Material.create({
+        ...settings, shaderModule: this._device.createShaderModule({
+          code: this._loader.getShader('main')!,
+          label: 'main',
+        })
+      });
       const renderPipeline = this._device.createRenderPipeline(material.pipelineDescriptor);
-      const r = { mesh, material: this._generateMaterial(mesh), renderPipeline }
+      const r = { mesh, material, renderPipeline }
 
       this._meshes.push(r);
     })

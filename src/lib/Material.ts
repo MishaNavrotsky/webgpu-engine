@@ -1,5 +1,6 @@
-import { DEPTH_STENCIL_FORMAT, MULTISAMPLE_COUNT } from "@/constants";
+import { DEPTH_STENCIL_FORMAT, MULTISAMPLE_COUNT, TEXTURE_SAMPLERS_IDS, VERTEX_BUFFER_IDS, TEXTURE_IDS, VERTEX_BUFFER_SIZES, VERTEX_BUFFER_SIZES_FORMAT } from "@/constants";
 import _ from 'lodash';
+import VBSG from "./VertexBuffersStateGenerator";
 
 export type MaterialConstructor = {
   id: string,
@@ -11,6 +12,7 @@ export type MaterialConstructor = {
   vertexBuffersState: (GPUVertexBufferLayout & { label: string })[],
   indicesBuffer: GPUBuffer | null,
   fragmentFormat?: GPUTextureFormat,
+  fragmentTargets?: Array<GPUColorTargetState>,
 }
 
 export type BindGroupType = {
@@ -49,7 +51,7 @@ export default class Material {
       fragment: {
         module: this._compiledShader,
         entryPoint: "fragment_main",
-        targets: [
+        targets: this._settings.fragmentTargets || [
           {
             format: settings.fragmentFormat || navigator.gpu.getPreferredCanvasFormat(),
           },
@@ -207,5 +209,106 @@ export default class Material {
     // if (!_.isEqual(currentSamplersLabels, newSamplersLabels)) console.warn(`${this._settings.id}: Swap Samplers Error: ${currentSamplersLabels} != ${newSamplersLabels}`)
 
     this._samplers = samplers;
+  }
+
+  static _device: GPUDevice | null = null;
+  static _zeroedTextures: { [key in keyof typeof TEXTURE_IDS]: GPUTexture } | null;
+  static _zeroedBuffers: { [key in keyof typeof VERTEX_BUFFER_IDS]: GPUBuffer } | null;
+  static _zeroedSamplers: { [key in keyof typeof TEXTURE_SAMPLERS_IDS]: GPUSampler } | null;
+
+
+
+  static setContext(device: GPUDevice) {
+    this._device = device;
+    const texSettings = (label: string): GPUTextureDescriptor => ({
+      format: 'rgba8unorm',
+      size: [1, 1, 1],
+      usage: GPUTextureUsage.TEXTURE_BINDING |
+        GPUTextureUsage.COPY_DST,
+      dimension: '2d',
+      label
+    });
+    this._zeroedTextures = {
+      colorTexture: this._device.createTexture(texSettings(TEXTURE_IDS.colorTexture)),
+      emissiveTexture: this._device.createTexture(texSettings(TEXTURE_IDS.emissiveTexture)),
+      metalicRoughnessTexture: this._device.createTexture(texSettings(TEXTURE_IDS.metalicRoughnessTexture)),
+      normalTexture: this._device.createTexture(texSettings(TEXTURE_IDS.normalTexture)),
+    }
+    this._device.queue.writeTexture({ texture: this._zeroedTextures.colorTexture }, new Uint8Array([255, 0, 0, 0]), {}, { width: 1, height: 1 })
+    this._device.queue.writeTexture({ texture: this._zeroedTextures.emissiveTexture }, new Uint8Array([0, 0, 0, 0]), {}, { width: 1, height: 1 })
+    this._device.queue.writeTexture({ texture: this._zeroedTextures.metalicRoughnessTexture }, new Uint8Array([0, 0, 0, 0]), {}, { width: 1, height: 1 })
+    this._device.queue.writeTexture({ texture: this._zeroedTextures.normalTexture }, new Uint8Array([0, 0, 0, 0]), {}, { width: 1, height: 1 })
+
+
+    const bufSettings = (label: string, size: number): GPUBufferDescriptor => ({
+      size,
+      usage: GPUBufferUsage.VERTEX | GPUBufferUsage.COPY_DST,
+      label,
+    })
+
+    this._zeroedBuffers = {
+      normalsBuffer: this._device.createBuffer(bufSettings(VERTEX_BUFFER_IDS.normalsBuffer, VERTEX_BUFFER_SIZES.normalsBuffer)),
+      texCoordsBuffer: this._device.createBuffer(bufSettings(VERTEX_BUFFER_IDS.texCoordsBuffer, VERTEX_BUFFER_SIZES.texCoordsBuffer)),
+      tangetsBuffer: this._device.createBuffer(bufSettings(VERTEX_BUFFER_IDS.tangetsBuffer, VERTEX_BUFFER_SIZES.tangetsBuffer)),
+      positionBuffer: this._device.createBuffer(bufSettings(VERTEX_BUFFER_IDS.positionBuffer, VERTEX_BUFFER_SIZES.positionBuffer))
+    }
+
+    this._device.queue.writeBuffer(this._zeroedBuffers.normalsBuffer, 0, new Float32Array([0, 0, 0]))
+    this._device.queue.writeBuffer(this._zeroedBuffers.positionBuffer, 0, new Float32Array([0, 0, 0]))
+    this._device.queue.writeBuffer(this._zeroedBuffers.tangetsBuffer, 0, new Float32Array([0, 0, 0, 0]))
+    this._device.queue.writeBuffer(this._zeroedBuffers.texCoordsBuffer, 0, new Float32Array([0, 0]))
+
+    this._zeroedSamplers = {
+      colorSampler: this._device.createSampler({ label: TEXTURE_SAMPLERS_IDS.colorSampler }),
+      emissiveSampler: this._device.createSampler({ label: TEXTURE_SAMPLERS_IDS.emissiveSampler }),
+      metalicRoughnessSampler: this._device.createSampler({ label: TEXTURE_SAMPLERS_IDS.metalicRoughnessSampler }),
+      normalSampler: this._device.createSampler({ label: TEXTURE_SAMPLERS_IDS.normalSampler })
+    }
+  }
+
+  static create(settings: MaterialConstructor): Material {
+
+
+    const vb: GPUBuffer[] = [this._zeroedBuffers?.positionBuffer!, this._zeroedBuffers?.texCoordsBuffer!, this._zeroedBuffers?.normalsBuffer!, this._zeroedBuffers?.tangetsBuffer!]
+    const vbsLabels = vb.map(v => v.label);
+    const originalUniqueVB = settings.vertexBuffers.filter(v => !vbsLabels.includes(v.label))
+    const vertexBuffers = vb.map(b => settings.vertexBuffers.find(o => b.label === o.label) || b)
+    vertexBuffers.push(...originalUniqueVB)
+
+    const tex: GPUTexture[] = [this._zeroedTextures?.colorTexture!, this._zeroedTextures?.normalTexture!, this._zeroedTextures?.emissiveTexture!, this._zeroedTextures?.metalicRoughnessTexture!]
+    const texLabels = tex.map(t => t.label);
+    const originalUniqueTex = settings.textures.filter(t => !texLabels.includes(t.label))
+    const textures = tex.map(t => settings.textures.find(o => t.label === o.label) || t)
+    textures.push(...originalUniqueTex)
+
+    const sam: GPUSampler[] = [this._zeroedSamplers?.colorSampler!, this._zeroedSamplers?.normalSampler!, this._zeroedSamplers?.emissiveSampler!, this._zeroedSamplers?.metalicRoughnessSampler!]
+    const samLabels = sam.map(s => s.label);
+    const originalUniqueSam = settings.samplers.filter(s => !samLabels.includes(s.label))
+    const samplers = sam.map(s => settings.samplers.find(o => s.label === o.label) || s)
+    samplers.push(...originalUniqueSam)
+
+    const existingVBSLabels = [VERTEX_BUFFER_IDS.positionBuffer, VERTEX_BUFFER_IDS.texCoordsBuffer, VERTEX_BUFFER_IDS.normalsBuffer, VERTEX_BUFFER_IDS.tangetsBuffer]
+    const vbs = new VBSG()
+      .add(VERTEX_BUFFER_IDS.positionBuffer, { format: VERTEX_BUFFER_SIZES_FORMAT.positionBuffer }, false)
+      .add(VERTEX_BUFFER_IDS.texCoordsBuffer, { format: VERTEX_BUFFER_SIZES_FORMAT.texCoordsBuffer }, false)
+      .add(VERTEX_BUFFER_IDS.normalsBuffer, { format: VERTEX_BUFFER_SIZES_FORMAT.normalsBuffer }, false)
+      .add(VERTEX_BUFFER_IDS.tangetsBuffer, { format: VERTEX_BUFFER_SIZES_FORMAT.tangetsBuffer }, false)
+
+    const originalVBS = settings.vertexBuffersState.filter(vbs => !existingVBSLabels.includes(vbs.label as any))
+    originalVBS.forEach(ovbs => vbs.add(ovbs.label, { format: (ovbs.attributes as any[])[0].format }, false));
+
+    const vertexBuffersState = vbs.end()
+
+
+    const mSettings: MaterialConstructor = {
+      ...settings,
+      vertexBuffers,
+      textures,
+      samplers,
+      vertexBuffersState
+    }
+
+    return new Material(mSettings)
+
   }
 }
