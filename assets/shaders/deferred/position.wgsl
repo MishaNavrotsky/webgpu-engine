@@ -1,5 +1,6 @@
 struct VertexOut {
   @builtin(position) position: vec4f,
+  @location(0) worldPosition: vec4f,
 }
 
 struct Camera {
@@ -14,11 +15,12 @@ struct Camera {
 fn vertex_main(@location(0) position: vec4f) -> VertexOut {
   var out: VertexOut;
   out.position = camera.projection * camera.view * camera.model * position;
+  out.worldPosition = camera.model * position;
 
   return out;
 }
 
 @fragment
 fn fragment_main(in: VertexOut) -> @location(0) vec4f {
-  return in.position;
+  return in.worldPosition;
 }

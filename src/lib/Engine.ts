@@ -78,6 +78,7 @@ export default class Engine {
     await this._loader.loadShader('deferred/vBiTangents', '/assets/shaders/deferred/vBiTangents.wgsl');
     await this._loader.loadShader('deferred/vNormals', '/assets/shaders/deferred/vNormals.wgsl');
     await this._loader.loadShader('deferred/vTangents', '/assets/shaders/deferred/vTangents.wgsl');
+    await this._loader.loadShader('deferred/main', '/assets/shaders/deferred/main.wgsl');
 
 
 
