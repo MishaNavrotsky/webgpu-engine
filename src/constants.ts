@@ -43,3 +43,6 @@ export const UNIFORM_BUFFER_IDS = {
   settings: 'settings',
 }
 
+export const D_PASS_TEXTURE_FORMAT: GPUTextureFormat = 'rgba32float'
+export const D_PASS_FRAGMENT_OUTS = ['albedo', 'emissive', 'metalicRoughness', 'pNormals', 'worldPosition', 'vBiTangents', 'vNormals', 'vTangents'] as const
+

@@ -61,17 +61,8 @@ export default class Engine {
     this._controls.subscribe();
     await this._loader.loadShader('main', '/assets/shaders/main.wgsl');
 
-    await this._loader.loadShader('deferred/albdeo', '/assets/shaders/deferred/albedo.wgsl');
-    await this._loader.loadShader('deferred/emissive', '/assets/shaders/deferred/emissive.wgsl');
-    await this._loader.loadShader('deferred/metalicRoughness', '/assets/shaders/deferred/metalicRoughness.wgsl');
-    await this._loader.loadShader('deferred/pNormals', '/assets/shaders/deferred/pNormals.wgsl');
-    await this._loader.loadShader('deferred/position', '/assets/shaders/deferred/position.wgsl');
-    await this._loader.loadShader('deferred/vBiTangents', '/assets/shaders/deferred/vBiTangents.wgsl');
-    await this._loader.loadShader('deferred/vNormals', '/assets/shaders/deferred/vNormals.wgsl');
-    await this._loader.loadShader('deferred/vTangents', '/assets/shaders/deferred/vTangents.wgsl');
+    await this._loader.loadShader('deferred/prepareBuffers', '/assets/shaders/deferred/prepareBuffers.wgsl');
     await this._loader.loadShader('deferred/main', '/assets/shaders/deferred/main.wgsl');
-
-
 
     await this._loader.loadGLB('tyan', '/assets/models/alicev2rigged.glb');
     await this._loader.loadGLB('hand', '/assets/models/hand_low_poly.glb');

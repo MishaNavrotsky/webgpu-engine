@@ -24,7 +24,7 @@ struct PointLight {
 @group(1) @binding(1) var tEmissive : texture_2d<f32>;
 @group(1) @binding(2) var tMetalicRoughness : texture_2d<f32>;
 @group(1) @binding(3) var tpNormals : texture_2d<f32>;
-@group(1) @binding(4) var tPosition : texture_2d<f32>;
+@group(1) @binding(4) var tWorldPosition : texture_2d<f32>;
 @group(1) @binding(5) var tvBiTangents : texture_2d<f32>;
 @group(1) @binding(6) var tvNormals : texture_2d<f32>;
 @group(1) @binding(7) var tvTangents : texture_2d<f32>;
@@ -52,7 +52,7 @@ fn fragment_main(in: VertexOut) -> @location(0) vec4f {
   var emissive = textureLoad(tEmissive, pos, 0);
   var metalicRoughness = textureLoad(tMetalicRoughness,  pos, 0);
   var pNormals = textureLoad(tpNormals, pos, 0);
-  var position = textureLoad(tPosition, pos, 0);
+  var worldPosition = textureLoad(tWorldPosition, pos, 0);
   var vBiTangents = textureLoad(tvBiTangents, pos, 0);
   var vNormals = textureLoad(tvNormals, pos, 0);
   var vTangents = textureLoad(tvTangents, pos, 0);

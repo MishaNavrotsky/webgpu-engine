@@ -5,8 +5,7 @@ import Material, { MaterialConstructor } from "./Material";
 import Mesh from "./Mesh";
 import UI from "@/ui";
 import VBSG from "./VertexBuffersStateGenerator";
-import { INDICES_BUFFER_ID, UNIFORM_BUFFER_IDS, VERTEX_BUFFER_IDS, TEXTURE_IDS, TEXTURE_SAMPLERS_IDS } from "@/constants";
-import { cloneDeep } from "lodash";
+import { INDICES_BUFFER_ID, UNIFORM_BUFFER_IDS, VERTEX_BUFFER_IDS, TEXTURE_IDS, TEXTURE_SAMPLERS_IDS, D_PASS_TEXTURE_FORMAT, D_PASS_FRAGMENT_OUTS } from "@/constants";
 
 type PointLight = {
   position: vec4,
@@ -16,26 +15,9 @@ type PointLight = {
 
 type MeshData = Array<{ mesh: Mesh, material: Material, renderPipeline: GPURenderPipeline, type?: 'forward' | 'deferred' }>
 
-const D_PASSES = ['deferred/albdeo', 'deferred/emissive', 'deferred/metalicRoughness', 'deferred/pNormals', 'deferred/position', 'deferred/vBiTangents', 'deferred/vNormals', 'deferred/vTangents'] as const;
-type DPassName = typeof D_PASSES[number];
-type DPassPrepObj = {
-  [key in DPassName]: {
-    material: Material,
-    texture?: GPUTexture,
-    renderPassDescriptor?: GPURenderPassDescriptor,
-    renderPipeline?: GPURenderPipeline,
-    requiredTexture?: typeof TEXTURE_IDS[keyof typeof TEXTURE_IDS],
-    requiredSampler?: typeof TEXTURE_SAMPLERS_IDS[keyof typeof TEXTURE_SAMPLERS_IDS]
-
-  };
-}
-
 type RendererConstructor = {
   camera: Camera, loader: Loader, canvas: HTMLCanvasElement
 }
-
-const D_PASS_TEXTURE_FORMAT: GPUTextureFormat = 'rgba32float'
-
 export default class Renderer {
   private _meshes: MeshData = [];
   private _camera: Camera;
@@ -52,8 +34,12 @@ export default class Renderer {
 
   private _depthTexture!: GPUTexture;
   private _depthTextureView!: GPUTextureView;
-  private _deferredDepthTexture!: GPUTexture;
-  private _deferredDepthTextureView!: GPUTextureView;
+  private _deferredDepthTexture?: GPUTexture;
+  private _deferredDepthTextureView?: GPUTextureView;
+
+  private _dPassResult?: GPUTexture[];
+  private _dPassMaterial?: Material;
+  private _dPassRenderPipeline?: GPURenderPipeline;
 
   constructor(settings: RendererConstructor) {
     this._canvas = settings.canvas;
@@ -70,8 +56,7 @@ export default class Renderer {
       this._callbackToDoBeforeRender = () => {
         this.createDepthTexture();
         this.createDeferredDepthTexture();
-        this.createTexturesForDPassPrepObj();
-        this.createRenderPassDescriptorsForDPassPrepObj()
+        this.prepareTexturesForGBuffers();
 
         this._callbackToDoBeforeRender = () => { }
       }
@@ -97,7 +82,12 @@ export default class Renderer {
       throw Error("Couldn't request WebGPU adapter.");
     }
 
-    this._device = await adapter.requestDevice();
+    this._device = await adapter.requestDevice({
+      requiredLimits: {
+        maxColorAttachmentBytesPerSample: 128,
+      },
+      requiredFeatures: ['timestamp-query']
+    });
     this._context = this._canvas.getContext('webgpu')!;
     this._context.configure({
       device: this._device,
@@ -112,7 +102,6 @@ export default class Renderer {
   private _deferredRendererMesh!: { mesh: Mesh, material: Material }
 
   private async prepareMeshForGBuffers() {
-    const gbuffers = Object.values(this._dPassPrepObj).map(v => v.texture) as GPUTexture[];
     const quadMesh = new Mesh({
       id: 'full-screen',
       indices: new Uint32Array([0, 1, 2, 2, 3, 0]),
@@ -135,7 +124,7 @@ export default class Renderer {
       shaderModule: this._device.createShaderModule({
         code: this._loader.getShader('deferred/main')!
       }),
-      textures: gbuffers,
+      textures: this._dPassResult!,
       uniformBuffers: [
         this._device.createBuffer({
           size: 4 * 4 * 4 * 3,
@@ -169,6 +158,7 @@ export default class Renderer {
     this._device.queue.writeBuffer(material.indicesBuffer!, 0, quadMesh.indices);
 
     this._deferredRendererMesh = { mesh: quadMesh, material };
+
     this._meshes.push({ ...this._deferredRendererMesh, type: 'forward', renderPipeline: this._device.createRenderPipeline(material.pipelineDescriptor) })
   }
 
@@ -178,7 +168,6 @@ export default class Renderer {
     {
       this._camera.calculate(dT, true);
       await this.renderGBuffers();
-      this._deferredRendererMesh.material.swapTextures(Object.values(this._dPassPrepObj).map(v => v.texture) as GPUTexture[]);
       await this.forwardRender();
     }
     this._lastCpuTime = performance.now() - cpuTimeStart;
@@ -206,260 +195,78 @@ export default class Renderer {
       usage: GPUTextureUsage.RENDER_ATTACHMENT,
       dimension: '2d',
     });
-    this._deferredDepthTextureView = this._deferredDepthTexture?.createView();
+    this._deferredDepthTextureView = this._deferredDepthTexture!.createView();
   }
 
-  private _passes = ['deferred/albdeo', 'deferred/emissive', 'deferred/metalicRoughness', 'deferred/pNormals', 'deferred/position', 'deferred/vBiTangents', 'deferred/vNormals', 'deferred/vTangents'] as const;
-  private _dPassPrepObj!: DPassPrepObj;
+  private prepareTexturesForGBuffers() {
+    this._dPassResult?.forEach(t => t.destroy());
+    this._dPassResult = D_PASS_FRAGMENT_OUTS.map(label => this._device.createTexture({
+      label,
+      format: D_PASS_TEXTURE_FORMAT,
+      size: [this._canvas.width, this._canvas.height, 1],
+      usage: GPUTextureUsage.RENDER_ATTACHMENT | GPUTextureUsage.TEXTURE_BINDING,
+    }))
 
-  private createTexturesForDPassPrepObj() {
-    Object.entries(this._dPassPrepObj || {}).forEach(([_, o]) => {
-      o.texture && o.texture.destroy()
-      o.texture = this._device.createTexture({
-        label: _,
-        format: D_PASS_TEXTURE_FORMAT,
-        size: [this._canvas.width, this._canvas.height, 1],
-        usage: GPUTextureUsage.TEXTURE_BINDING |
-          GPUTextureUsage.COPY_SRC |
-          GPUTextureUsage.RENDER_ATTACHMENT,
-      })
-    })
-  }
-
-  private createRenderPassDescriptorsForDPassPrepObj() {
-    const defDesc: GPURenderPassDescriptor = {
-      label: 'createRenderPassDescriptorsForDPassPrepObj',
-      colorAttachments: [
-        {
-          loadOp: "clear",
-          storeOp: "store",
-          view: this._context.getCurrentTexture().createView({ label: 'default view' }),
-
-        },
-      ],
-      depthStencilAttachment: {
-        view: this._deferredDepthTextureView,
-        depthStoreOp: 'store',
-        depthLoadOp: 'clear',
-        depthClearValue: 1.0,
-      }
-    };
-
-    this._dPassPrepObj[this._passes[0]].renderPassDescriptor = cloneDeep(defDesc);
-    //@ts-ignore
-    this._dPassPrepObj[this._passes[0]].renderPassDescriptor!.colorAttachments[0].view = this._dPassPrepObj[this._passes[0]].texture!.createView();
-
-    for (let i = 1; i < this._passes.length; i++) {
-      const ppo = this._dPassPrepObj[this._passes[i]]
-      ppo.renderPassDescriptor = cloneDeep(defDesc);
-      //@ts-ignore
-      ppo.renderPassDescriptor!.colorAttachments[0].view = ppo.texture!.createView()
-      ppo.renderPassDescriptor!.depthStencilAttachment!.depthStoreOp = 'store'
-      ppo.renderPassDescriptor!.depthStencilAttachment!.depthLoadOp = 'load'
-    }
+    this._deferredRendererMesh && this._deferredRendererMesh.material.swapTextures(this._dPassResult);
   }
 
   async initDeferredRender() {
-    const passesShaders = this._passes.map(p => this._loader.getShader(p)!)
-    const compiledShaders = passesShaders.map((s, i) =>
-      this._device.createShaderModule({ code: s, label: this._passes[i] })
-    )
+    this._dPassMaterial = Material.create({
+      id: 'gbufferPass',
+      indicesBuffer: null,
+      samplers: [],
+      textures: [],
+      uniformBuffers: [],
+      vertexBuffersState: [],
+      vertexBuffers: [],
+      shaderModule: this._device.createShaderModule({
+        label: 'deferred/prepareBuffers',
+        code: this._loader.getShader('deferred/prepareBuffers')!
+      }),
+      fragmentTargets: D_PASS_FRAGMENT_OUTS.map(() => ({ format: D_PASS_TEXTURE_FORMAT }))
+    })
 
-    this._dPassPrepObj = {
-      'deferred/albdeo': {
-        material: new Material({
-          id: 'deferred/albdeo',
-          indicesBuffer: null,
-          samplers: [],
-          shaderModule: compiledShaders[0],
-          textures: [],
-          uniformBuffers: [],
-          vertexBuffers: [],
-          vertexBuffersState: new VBSG()
-            .add(VERTEX_BUFFER_IDS.positionBuffer, { format: 'float32x3' }, false)
-            .add(VERTEX_BUFFER_IDS.texCoordsBuffer, { format: 'float32x2' }, false)
-            .end(),
-          fragmentFormat: D_PASS_TEXTURE_FORMAT
-        }),
-        requiredTexture: TEXTURE_IDS.colorTexture,
-        requiredSampler: TEXTURE_SAMPLERS_IDS.colorSampler,
-      },
-      'deferred/emissive': {
-        material: new Material({
-          id: 'deferred/emissive',
-          indicesBuffer: null,
-          samplers: [],
-          shaderModule: compiledShaders[1],
-          textures: [],
-          uniformBuffers: [],
-          vertexBuffers: [],
-          vertexBuffersState: new VBSG()
-            .add(VERTEX_BUFFER_IDS.positionBuffer, { format: 'float32x3' }, false)
-            .add(VERTEX_BUFFER_IDS.texCoordsBuffer, { format: 'float32x2' }, false)
-            .end(),
-          fragmentFormat: D_PASS_TEXTURE_FORMAT
-        }),
-        requiredTexture: TEXTURE_IDS.emissiveTexture,
-        requiredSampler: TEXTURE_SAMPLERS_IDS.emissiveSampler,
-      },
-      "deferred/metalicRoughness": {
-        material: new Material({
-          id: 'deferred/metalicRoughness',
-          indicesBuffer: null,
-          samplers: [],
-          shaderModule: compiledShaders[2],
-          textures: [],
-          uniformBuffers: [],
-          vertexBuffers: [],
-          vertexBuffersState: new VBSG()
-            .add(VERTEX_BUFFER_IDS.positionBuffer, { format: 'float32x3' }, false)
-            .add(VERTEX_BUFFER_IDS.texCoordsBuffer, { format: 'float32x2' }, false)
-            .end(),
-          fragmentFormat: D_PASS_TEXTURE_FORMAT
-        }),
-        requiredTexture: TEXTURE_IDS.metalicRoughnessTexture,
-        requiredSampler: TEXTURE_SAMPLERS_IDS.metalicRoughnessSampler,
-      },
-      "deferred/pNormals": {
-        material: new Material({
-          id: 'deferred/pNormals',
-          indicesBuffer: null,
-          samplers: [],
-          shaderModule: compiledShaders[3],
-          textures: [],
-          uniformBuffers: [],
-          vertexBuffers: [],
-          vertexBuffersState: new VBSG()
-            .add(VERTEX_BUFFER_IDS.positionBuffer, { format: 'float32x3' }, false)
-            .add(VERTEX_BUFFER_IDS.texCoordsBuffer, { format: 'float32x2' }, false)
-            .end(),
-          fragmentFormat: D_PASS_TEXTURE_FORMAT
-        }),
-        requiredTexture: TEXTURE_IDS.normalTexture,
-        requiredSampler: TEXTURE_SAMPLERS_IDS.normalSampler,
-      },
-      "deferred/position": {
-        material: new Material({
-          id: 'deferred/position',
-          indicesBuffer: null,
-          samplers: [],
-          shaderModule: compiledShaders[4],
-          textures: [],
-          uniformBuffers: [],
-          vertexBuffers: [],
-          vertexBuffersState: new VBSG()
-            .add(VERTEX_BUFFER_IDS.positionBuffer, { format: 'float32x3' }, false)
-            .end(),
-          fragmentFormat: D_PASS_TEXTURE_FORMAT
-        }),
-      },
-      "deferred/vBiTangents": {
-        material: new Material({
-          id: 'deferred/vBiTangents',
-          indicesBuffer: null,
-          samplers: [],
-          shaderModule: compiledShaders[5],
-          textures: [],
-          uniformBuffers: [],
-          vertexBuffers: [],
-          vertexBuffersState: new VBSG()
-            .add(VERTEX_BUFFER_IDS.positionBuffer, { format: 'float32x3' }, false)
-            .add(VERTEX_BUFFER_IDS.normalsBuffer, { format: 'float32x3' }, false)
-            .add(VERTEX_BUFFER_IDS.tangetsBuffer, { format: 'float32x4' }, false)
-            .end(),
-          fragmentFormat: D_PASS_TEXTURE_FORMAT,
-        }),
-      },
-      "deferred/vNormals": {
-        material: new Material({
-          id: 'deferred/vNormals',
-          indicesBuffer: null,
-          samplers: [],
-          shaderModule: compiledShaders[6],
-          textures: [],
-          uniformBuffers: [],
-          vertexBuffers: [],
-          vertexBuffersState: new VBSG()
-            .add(VERTEX_BUFFER_IDS.positionBuffer, { format: 'float32x3' }, false)
-            .add(VERTEX_BUFFER_IDS.normalsBuffer, { format: 'float32x3' }, false)
-            .end(),
-          fragmentFormat: D_PASS_TEXTURE_FORMAT,
-        }),
-      },
-      "deferred/vTangents": {
-        material: new Material({
-          id: 'deferred/vTangents',
-          indicesBuffer: null,
-          samplers: [],
-          shaderModule: compiledShaders[7],
-          textures: [],
-          uniformBuffers: [],
-          vertexBuffers: [],
-          vertexBuffersState: new VBSG()
-            .add(VERTEX_BUFFER_IDS.positionBuffer, { format: 'float32x3' }, false)
-            .add(VERTEX_BUFFER_IDS.tangetsBuffer, { format: 'float32x4' }, false)
-            .end(),
-          fragmentFormat: D_PASS_TEXTURE_FORMAT
-        }),
-      }
-    }
-
-    this._dPassPrepObj[this._passes[0]].material.enableDepthWrite(true);
-    this._dPassPrepObj[this._passes[0]].renderPipeline = this._device.createRenderPipeline(this._dPassPrepObj[this._passes[0]].material.pipelineDescriptor);
-    for (var i = 1; i < this._passes.length; i++) {
-      this._dPassPrepObj[this._passes[i]].material.enableDepthWrite(false);
-      this._dPassPrepObj[this._passes[i]].material.setDepthCompare('equal');
-      this._dPassPrepObj[this._passes[i]].renderPipeline = this._device.createRenderPipeline(this._dPassPrepObj[this._passes[i]].material.pipelineDescriptor);
-    }
-
-    this.createTexturesForDPassPrepObj();
-    this.createRenderPassDescriptorsForDPassPrepObj();
+    this._dPassRenderPipeline = this._device.createRenderPipeline(this._dPassMaterial.pipelineDescriptor);
+    this.prepareTexturesForGBuffers();
     this.prepareMeshForGBuffers();
   }
 
   private async renderGBuffers() {
+    if (!this._dPassMaterial) return;
     const encoder = this._device.createCommandEncoder({ label: 'deferred' });
-    for (let i = 0; i < this._passes.length; i++) {
-      const passId = this._passes[i];
-      const ppo = this._dPassPrepObj[passId];
-      const passEncoder = encoder.beginRenderPass(ppo.renderPassDescriptor!)
-      const vertexBuffersStateLabels = ppo.material.vertexBuffersState.map(vbs => vbs.label);
-
-      for (const m of this._meshes) {
-        const vbs: (GPUBuffer | undefined)[] = [];
-        for (const label of vertexBuffersStateLabels) {
-          const vb = m.material.vertexBuffers.find(vb => vb.label === label)
-          vbs.push(vb)
-        }
-
-        if (vbs.includes(undefined)) continue;
-
-        const texture = ppo.requiredTexture && m.material.textures.find(t => t.label === ppo.requiredTexture)
-        if (ppo.requiredTexture && !texture) continue;
-
-        const sampler = ppo.requiredSampler && m.material.samplers.find(t => t.label === ppo.requiredSampler)
-        if (ppo.requiredSampler && !sampler) continue;
-
-        texture && ppo.material.swapTextures([texture]);
-        sampler && ppo.material.swapSamplers([sampler]);
-
-        const modelMatrix = m.mesh.modelMatrix;
-        const viewMatrix = this._camera.viewMatrix;
-        const projectionMatrix = this._camera.projectionMatrix;
-
-        const cameraUB = m.material.uniformBuffers[0]
-        this._device.queue.writeBuffer(cameraUB, 0, new Float32Array([...projectionMatrix, ...viewMatrix, ...modelMatrix]));
-        ppo.material.swapUnifromBuffers([cameraUB]);
-
-        ppo.material.swapVertexBuffers(vbs as GPUBuffer[]);
-
-        ppo.material.swapIndicesBuffer(m.material.indicesBuffer!);
-
-        const renderPipeline = ppo.renderPipeline!;
-        this.renderMesh(m.mesh, ppo.material, renderPipeline, passEncoder);
+    const passEncoder = encoder.beginRenderPass({
+      label: 'deferred',
+      colorAttachments: D_PASS_FRAGMENT_OUTS.map((_, i) => ({
+        loadOp: 'clear',
+        storeOp: 'store',
+        view: this._dPassResult![i].createView()
+      })),
+      depthStencilAttachment: {
+        view: this._deferredDepthTextureView!,
+        depthStoreOp: 'store',
+        depthLoadOp: 'clear',
+        depthClearValue: 1.0,
       }
-      passEncoder.end();
+    })
+
+    for (const m of this._meshes) {
+      if (m.type === 'forward') continue;
+      this._dPassMaterial.swapTextures(m.material.textures);
+      this._dPassMaterial.swapSamplers(m.material.samplers);
+
+      const modelMatrix = m.mesh.modelMatrix;
+      const viewMatrix = this._camera.viewMatrix;
+      const projectionMatrix = this._camera.projectionMatrix;
+
+      const cameraUB = m.material.uniformBuffers[0]
+      this._device.queue.writeBuffer(cameraUB, 0, new Float32Array([...projectionMatrix, ...viewMatrix, ...modelMatrix]));
+      this._dPassMaterial.swapUnifromBuffers([cameraUB]);
+      this._dPassMaterial.swapVertexBuffers(m.material.vertexBuffers);
+      this._dPassMaterial.swapIndicesBuffer(m.material.indicesBuffer!);
+
+      this.renderMesh(m.mesh, this._dPassMaterial, this._dPassRenderPipeline!, passEncoder);
     }
+    passEncoder.end();
     return this._device.queue.submit([encoder.finish()]);
   }
 
@@ -481,12 +288,12 @@ export default class Renderer {
       }
     };
 
-    const encoder = this._device.createCommandEncoder();
+    const encoder = this._device.createCommandEncoder({ label: 'forward' });
     const passEncoder = encoder.beginRenderPass(renderPassDescriptor)
 
 
     for (const m of this._meshes) {
-      if (m.type === 'forward') continue;
+      if (m.type !== 'forward') continue;
       const mesh = m.mesh;
       const material = m.material;
 
