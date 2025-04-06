@@ -1,4 +1,4 @@
-import { vec4 } from "gl-matrix";
+import { mat4, vec4 } from "gl-matrix";
 import Camera from "./Camera";
 import Loader from "./Loader";
 import Material, { MaterialConstructor } from "./Material";
@@ -6,6 +6,18 @@ import Mesh from "./Mesh";
 import UI from "@/ui";
 import VBSG from "./VertexBuffersStateGenerator";
 import { INDICES_BUFFER_ID, UNIFORM_BUFFER_IDS, VERTEX_BUFFER_IDS, TEXTURE_IDS, TEXTURE_SAMPLERS_IDS, D_PASS_TEXTURE_FORMAT, D_PASS_FRAGMENT_OUTS } from "@/constants";
+
+export const DRENDER_MODES = {
+  diffuse: 0,
+  albedo: 1,
+  emissive: 2,
+  metalicRoughness: 3,
+  pNormals: 4,
+  worldPosition: 5,
+  vBiTangents: 6,
+  vNormals: 7,
+  vTangents: 8,
+}
 
 type PointLight = {
   position: vec4,
@@ -127,15 +139,20 @@ export default class Renderer {
       textures: this._dPassResult!,
       uniformBuffers: [
         this._device.createBuffer({
-          size: 4 * 4 * 4 * 3,
+          size: 4 * 4 * 4 * 4 + 4 * 4,
           usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
           label: UNIFORM_BUFFER_IDS.camera,
-        }), //MVP,
+        }), //MVP + NM + POS,
         this._device.createBuffer({
           size: 4 * 4 + 4 * 4 + 4 * 4, //vec4 + vec4 + vec4
           usage: GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_DST,
           label: UNIFORM_BUFFER_IDS.pointLights
-        }) //point lights
+        }), //point lights
+        this._device.createBuffer({
+          size: 4, //vec4 + vec4 + vec4
+          usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
+          label: UNIFORM_BUFFER_IDS.settings
+        }) //settings,
       ],
       vertexBuffers: [
         this._device.createBuffer({
@@ -257,9 +274,12 @@ export default class Renderer {
       const modelMatrix = m.mesh.modelMatrix;
       const viewMatrix = this._camera.viewMatrix;
       const projectionMatrix = this._camera.projectionMatrix;
+      const normalMatrix = mat4.create();
+      mat4.invert(normalMatrix, modelMatrix);
+      mat4.transpose(normalMatrix, normalMatrix)
 
       const cameraUB = m.material.uniformBuffers[0]
-      this._device.queue.writeBuffer(cameraUB, 0, new Float32Array([...projectionMatrix, ...viewMatrix, ...modelMatrix]));
+      this._device.queue.writeBuffer(cameraUB, 0, new Float32Array([...projectionMatrix, ...viewMatrix, ...modelMatrix, ...normalMatrix, ...this._camera.position, 0]));
       this._dPassMaterial.swapUnifromBuffers([cameraUB]);
       this._dPassMaterial.swapVertexBuffers(m.material.vertexBuffers);
       this._dPassMaterial.swapIndicesBuffer(m.material.indicesBuffer!);
@@ -293,18 +313,23 @@ export default class Renderer {
 
 
     for (const m of this._meshes) {
-      if (m.type !== 'forward') continue;
+      // if (m.type === 'forward') continue;
       const mesh = m.mesh;
       const material = m.material;
 
       const modelMatrix = mesh.modelMatrix;
       const viewMatrix = this._camera.viewMatrix;
       const projectionMatrix = this._camera.projectionMatrix;
+      const normalMatrix = mat4.create();
+      mat4.invert(normalMatrix, modelMatrix);
+      mat4.transpose(normalMatrix, normalMatrix)
 
       const pointLight: PointLight = this._ui?.lightsInfo!;
+      const deferredSettings = this._ui?.deferredSettings!;
 
-      material.uniformBuffers[0] && this._device.queue.writeBuffer(material.uniformBuffers[0], 0, new Float32Array([...projectionMatrix, ...viewMatrix, ...modelMatrix]));
+      material.uniformBuffers[0] && this._device.queue.writeBuffer(material.uniformBuffers[0], 0, new Float32Array([...projectionMatrix, ...viewMatrix, ...modelMatrix, ...normalMatrix, ...this._camera.position, 0]));
       material.uniformBuffers[1] && this._device.queue.writeBuffer(material.uniformBuffers[1], 0, new Float32Array([...pointLight.position, ...pointLight.color, ...pointLight.intensityRadiusZZ]));
+      material.uniformBuffers[2] && this._device.queue.writeBuffer(material.uniformBuffers[2], 0, new Uint32Array([deferredSettings]));
 
       const renderPipeline = m.renderPipeline;
 
@@ -340,7 +365,7 @@ export default class Renderer {
         usage: GPUTextureUsage.TEXTURE_BINDING |
           GPUTextureUsage.COPY_DST |
           GPUTextureUsage.RENDER_ATTACHMENT,
-        size: [mesh.textures!.color.width, mesh.textures!.color.height, 1],
+        size: [i.width, i.height, 1],
         label
       })
     }
@@ -397,10 +422,10 @@ export default class Renderer {
 
     const uniformBuffers: GPUBuffer[] = [
       this._device.createBuffer({
-        size: 4 * 4 * 4 * 3,
+        size: 4 * 4 * 4 * 4 + 4 * 4,
         usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
         label: UNIFORM_BUFFER_IDS.camera,
-      }), //MVP,
+      }), //MVP + NM + POS,
       this._device.createBuffer({
         size: 4 * 4 + 4 * 4 + 4 * 4, //vec4 + vec4 + vec4
         usage: GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_DST,

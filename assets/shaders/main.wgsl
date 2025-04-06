@@ -11,6 +11,7 @@ struct Camera {
   projection: mat4x4<f32>,
   view: mat4x4<f32>,
   model: mat4x4<f32>,
+  normalMatrix: mat4x4<f32>,
 }
 
 struct PointLight {

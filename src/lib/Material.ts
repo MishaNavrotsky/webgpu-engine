@@ -234,7 +234,7 @@ export default class Material {
       metalicRoughnessTexture: this._device.createTexture(texSettings(TEXTURE_IDS.metalicRoughnessTexture)),
       normalTexture: this._device.createTexture(texSettings(TEXTURE_IDS.normalTexture)),
     }
-    this._device.queue.writeTexture({ texture: this._zeroedTextures.colorTexture }, new Uint8Array([255, 0, 0, 0]), {}, { width: 1, height: 1 })
+    this._device.queue.writeTexture({ texture: this._zeroedTextures.colorTexture }, new Uint8Array([0, 0, 0, 0]), {}, { width: 1, height: 1 })
     this._device.queue.writeTexture({ texture: this._zeroedTextures.emissiveTexture }, new Uint8Array([0, 0, 0, 0]), {}, { width: 1, height: 1 })
     this._device.queue.writeTexture({ texture: this._zeroedTextures.metalicRoughnessTexture }, new Uint8Array([0, 0, 0, 0]), {}, { width: 1, height: 1 })
     this._device.queue.writeTexture({ texture: this._zeroedTextures.normalTexture }, new Uint8Array([0, 0, 0, 0]), {}, { width: 1, height: 1 })
@@ -259,10 +259,10 @@ export default class Material {
     this._device.queue.writeBuffer(this._zeroedBuffers.texCoordsBuffer, 0, new Float32Array([0, 0]))
 
     this._zeroedSamplers = {
-      colorSampler: this._device.createSampler({ label: TEXTURE_SAMPLERS_IDS.colorSampler }),
-      emissiveSampler: this._device.createSampler({ label: TEXTURE_SAMPLERS_IDS.emissiveSampler }),
-      metalicRoughnessSampler: this._device.createSampler({ label: TEXTURE_SAMPLERS_IDS.metalicRoughnessSampler }),
-      normalSampler: this._device.createSampler({ label: TEXTURE_SAMPLERS_IDS.normalSampler })
+      colorSampler: this._device.createSampler({ magFilter: 'linear', minFilter: 'linear', mipmapFilter: 'linear', label: TEXTURE_SAMPLERS_IDS.colorSampler, maxAnisotropy: 16 }),
+      emissiveSampler: this._device.createSampler({ magFilter: 'linear', minFilter: 'linear', mipmapFilter: 'linear', label: TEXTURE_SAMPLERS_IDS.emissiveSampler }),
+      metalicRoughnessSampler: this._device.createSampler({ magFilter: 'linear', minFilter: 'linear', mipmapFilter: 'linear', label: TEXTURE_SAMPLERS_IDS.metalicRoughnessSampler, maxAnisotropy: 16 }),
+      normalSampler: this._device.createSampler({ magFilter: 'linear', minFilter: 'linear', mipmapFilter: 'linear', label: TEXTURE_SAMPLERS_IDS.normalSampler, maxAnisotropy: 16 })
     }
   }
 

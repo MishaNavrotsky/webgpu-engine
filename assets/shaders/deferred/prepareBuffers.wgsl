@@ -11,6 +11,8 @@ struct Camera {
   projection: mat4x4<f32>,
   view: mat4x4<f32>,
   model: mat4x4<f32>,
+  normalMatrix: mat4x4<f32>,
+  worldPosition: vec4f,
 }
 
 @group(0) @binding(0) var<uniform> camera: Camera;
@@ -31,9 +33,9 @@ fn vertex_main(@location(0) position: vec4f, @location(1) texCoords: vec2f, @loc
   out.position = camera.projection * camera.view * camera.model * position;
   out.texCoords = texCoords;  
   out.worldPosition = (camera.model * position).xyz;
-  out.bitangents = tangents.w * cross(normals.xyz, tangents.xyz);
-  out.tangents = tangents;
-  out.normals = normals;
+  out.bitangents = (camera.model * vec4f(cross(tangents.xyz, normals.xyz), 0)).xyz;
+  out.tangents = camera.model * vec4f(tangents.xyz, 0);
+  out.normals = (camera.model * vec4f(normals, 0)).xyz;
 
   return out;
 }
@@ -63,9 +65,9 @@ fn fragment_main(in: VertexOut) -> FragmentOut {
   out.pNormals = tNormals;
 
   out.worldPosition = vec4f(in.worldPosition, 0);
-  out.vBiTangents = vec4f(in.bitangents, 0);
-  out.vNormals = vec4f(in.normals, 0);
-  out.vTangents = in.tangents;
+  out.vBiTangents = normalize(vec4f(in.bitangents, 0));
+  out.vNormals = normalize(vec4f(in.normals, 0));
+  out.vTangents = normalize(vec4f(in.tangents.xyz, 0));
 
   return out;
 }

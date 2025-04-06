@@ -8,8 +8,8 @@ vUp[1] = 1;
 class Camera {
   private _mView: mat4 = mat4.create();
   private _mProjection: mat4 = mat4.create();
-  private _vLook: vec3 = [0, 0, 1];
-  private _vTranslate: vec3 = vec3.create();
+  private _vLook: vec3 = vec3.create();
+  private _vTranslate: vec3 = vec3.fromValues(4, 120, 230);
 
   private _controls: Controls;
 

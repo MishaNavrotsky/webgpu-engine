@@ -1,5 +1,8 @@
 import { GLB } from "@loaders.gl/gltf";
 import _ from 'lodash'
+import PQueue from "p-queue";
+
+const q = new PQueue({ concurrency: 1 })
 
 const ACCESSOR_COMPONENT_TYPE_TO_BYTES = {
   5126: 4,
@@ -45,8 +48,6 @@ export default class GLBMesh {
   private _rawGLB: GLB;
   constructor(glb: GLB) {
     this._rawGLB = glb;
-
-    console.log(this._rawGLB)
   }
 
   private getAccessor(id: number) {
@@ -117,7 +118,7 @@ export default class GLBMesh {
     const url = URL.createObjectURL(blob);
     const img = document.createElement('img');
     img.src = url;
-    await img.decode();
+    await q.add(() => img.decode());
     return { image: await createImageBitmap(img), sampler: this.resolveSampler(sampler) }
   }
 

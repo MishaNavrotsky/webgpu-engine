@@ -2,7 +2,7 @@ import { BindingParams, FolderApi, Pane } from 'tweakpane'
 import Camera from "@/lib/Camera";
 import Controls from "@/lib/Controls";
 import Loader from "@/lib/Loader";
-import Renderer from "@/lib/Renderer";
+import Renderer, { DRENDER_MODES } from "@/lib/Renderer";
 import { vec3toXYZ, XYZtoVec3, XYZWtoVec4 } from '@/utils/vec3utils';
 import Engine from '@/lib/Engine';
 
@@ -19,6 +19,7 @@ export default class UI {
   private _frameFolder: FolderApi | undefined;
   private _cameraFolder: FolderApi | undefined;
   private _lightFolder: FolderApi | undefined;
+  private _deferredSettingsFolder: FolderApi | undefined;
   private _settings: UIConstructor;
   private _cameraControls = {
     width: 0,
@@ -47,9 +48,11 @@ export default class UI {
 
   private _lightInfo = {
     position: { x: 0, y: 28, z: 161, w: 0 },
-    color: { x: 0, y: 0, z: 0, w: 0 },
-    intensityRadiusZZ: { x: 0.5, y: 0, z: 0, w: 0 },
+    color: { x: 1, y: 1, z: 1, w: 0 },
+    intensityRadiusZZ: { x: 0.5, y: 1000, z: 0, w: 0 },
   }
+
+  private _deferredSettings = 0;
   constructor(settings: UIConstructor) {
     this._settings = settings;
   }
@@ -90,6 +93,19 @@ export default class UI {
     Object.entries(this._lightInfo).forEach(([k, v]) => {
       this._lightFolder?.addBinding(this._lightInfo, k as any)
     })
+
+    this._deferredSettingsFolder = this._pane.addFolder({
+      title: 'Deferred'
+    })
+
+    const b = this._deferredSettingsFolder.addBlade({
+      view: 'list',
+      label: 'render',
+      options: Object.entries(DRENDER_MODES).map(([k, v]) => ({ text: k, value: v })),
+      value: 0,
+    });
+
+    this._deferredSettingsFolder.on('change', (v) => this._deferredSettings = v.value as number)
   }
 
   get lightsInfo() {
@@ -98,6 +114,10 @@ export default class UI {
       color: XYZWtoVec4(this._lightInfo.color),
       intensityRadiusZZ: XYZWtoVec4(this._lightInfo.intensityRadiusZZ),
     };
+  }
+
+  get deferredSettings() {
+    return this._deferredSettings;
   }
 
   private refreshCamera() {

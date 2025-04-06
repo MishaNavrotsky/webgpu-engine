@@ -21,6 +21,7 @@
     "@types/node": "^22.13.13",
     "gl-matrix": "^3.4.3",
     "lodash": "^4.17.21",
+    "p-queue": "^8.1.0",
     "pngjs": "^7.0.0",
     "tweakpane": "^4.0.5"
   }
