@@ -129,14 +129,13 @@ export default class GLBMesh {
         Object.entries(p.attributes).forEach(([k, v]) => {
           p.attributes[k] = this.resolveAccessorBufferData(v as number);
         })
+        const material = this.getMaterial(p.material)
+        p.pbr = { ...material.pbrMetallicRoughness }
         p.indices = this.resolveAccessorBufferData(p.indices);
         p.colorTexture = await this.resolveTextureByMaterial(p.material, 'pbrMetallicRoughness.baseColorTexture.index');
         p.normalTexture = await this.resolveTextureByMaterial(p.material, 'normalTexture.index');
         p.emissiveTexture = await this.resolveTextureByMaterial(p.material, 'emissiveTexture.index');
         p.metallicRoughnessTexture = await this.resolveTextureByMaterial(p.material, 'pbrMetallicRoughness.metallicRoughnessTexture.index');
-        const material = this.getMaterial(p.material)
-
-        p.pbr = { ...material.pbrMetallicRoughness }
       }
 
       return nm

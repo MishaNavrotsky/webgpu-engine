@@ -98,6 +98,8 @@ export default class UI {
       title: 'Deferred'
     })
 
+    console.log(999)
+
 
     this._deferredSettingsFolder.on('change', (v) => this._deferredSettings = v.value as number)
   }

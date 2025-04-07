@@ -4,10 +4,8 @@ import Material, { BindGroupType } from "../Material";
 import MeshData from "../MeshData";
 import ModelMatrix from "../ModelMatrix";
 import BuffersData from "../BuffersData";
-import { TEXTURE_IDS, VERTEX_BUFFER_IDS, TEXTURE_SAMPLERS_IDS, INDICES_BUFFER_ID, UNIFORM_BUFFER_IDS } from "@/constants";
+import { VERTEX_BUFFER_IDS, TEXTURE_SAMPLERS_IDS, INDICES_BUFFER_ID, UNIFORM_BUFFER_IDS } from "@/constants";
 import GLBMesh from "@/lib/loader/GLBMesh";
-import { RData } from "..";
-import VBSG from "../VertexBuffersStateGenerator";
 import RenderPipeline from "../RenderPipeline";
 import Loader from "@/lib/loader";
 import _ from 'lodash'

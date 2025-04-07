@@ -144,9 +144,11 @@ fn fragment_main(in: VertexOut) -> @location(0) vec4f {
     default: {
       var N = getNormal(vTangents.xyz, vBiTangents.xyz, vNormals.xyz, pNormals.xyz);
       var V = normalize(camera.worldPosition.xyz - worldPosition.xyz);
+      var metalic = metalicRoughness.b;
+      var roughness = metalicRoughness.g;
 
       var F0 = vec3f(0.04);
-      F0 = mix(F0, albedo.xyz, metalicRoughness.x);
+      F0 = mix(F0, albedo.xyz, metalic);
 
       var Lo = vec3(0.0);
       for(var i: u32 = 0; i < arrayLength(&pointLights); i++) {
@@ -166,13 +168,13 @@ fn fragment_main(in: VertexOut) -> @location(0) vec4f {
         // }
         
         // cook-torrance brdf
-        var NDF = DistributionGGX(N, H, metalicRoughness.y);        
-        var G   = GeometrySmith(N, V, L, metalicRoughness.y);      
+        var NDF = DistributionGGX(N, H, roughness);        
+        var G   = GeometrySmith(N, V, L, roughness);      
         var F    = fresnelSchlick(max(dot(H, V), 0.0), F0);       
         
         var kS = F;
         var kD = vec3(1.0) - kS;
-        kD *= 1.0 - metalicRoughness.x;	  
+        kD *= 1.0 - metalic;	  
         
         var numerator    = NDF * G * F;
         var denominator = 4.0 * max(dot(N, V), 0.0) * max(dot(N, L), 0.0) + 0.0001;
