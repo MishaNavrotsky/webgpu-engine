@@ -1,4 +1,4 @@
-import { TEXTURE_SAMPLERS_IDS, VERTEX_BUFFER_IDS, TEXTURE_IDS, VERTEX_BUFFER_SIZES, VBS_DEF_SEQUENCE, TEX_DEF_SEQUENCE, SAMPLERS_DEF_SEQUENCE } from "@/constants";
+import { TEXTURE_SAMPLERS_IDS, TEXTURE_IDS, TEX_DEF_SEQUENCE, SAMPLERS_DEF_SEQUENCE } from "@/constants";
 import _ from 'lodash';
 import RenderPipeline from "./RenderPipeline";
 

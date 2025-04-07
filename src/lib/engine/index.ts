@@ -4,7 +4,6 @@ import Loader from "@/lib/loader";
 import Renderer from "@/lib/render";
 import Scene from "@/lib/scene";
 import GLBMesh from "../loader/GLBMesh";
-import Mesh from "@/lib/render/MeshData";
 import RenderableObject from "../render/renderable/RenderableObject";
 
 export type EngineConstructor = {

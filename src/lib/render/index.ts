@@ -1,16 +1,15 @@
 import { mat4, vec4 } from "gl-matrix";
 import Camera from "@/lib/camera";
 import Loader from "@/lib/loader";
-import Material, { MaterialConstructor } from "./Material";
+import Material from "./Material";
 import MeshData from "./MeshData";
 import UI from "@/lib/ui";
 import VBSG from "./VertexBuffersStateGenerator";
-import { INDICES_BUFFER_ID, UNIFORM_BUFFER_IDS, VERTEX_BUFFER_IDS, TEXTURE_IDS, TEXTURE_SAMPLERS_IDS, D_PASS_TEXTURE_FORMAT, D_PASS_FRAGMENT_OUTS } from "@/constants";
+import { UNIFORM_BUFFER_IDS, VERTEX_BUFFER_IDS, D_PASS_TEXTURE_FORMAT, D_PASS_FRAGMENT_OUTS } from "@/constants";
 import RenderableObject from "./renderable/RenderableObject";
 import BuffersData from "./BuffersData";
 import RenderPipeline from "./RenderPipeline";
 import IRenderableObject from "./interfaces/IRenderableObject";
-import GLBMesh from "../loader/GLBMesh";
 import Scene from "../scene";
 
 export const DRENDER_MODES = {
@@ -384,7 +383,6 @@ export default class Renderer {
   }
 
   private renderRenderable(r: IRenderableObject, renderPipeline: GPURenderPipeline, passEncoder: GPURenderPassEncoder) {
-    const material = r.getMaterial();
     const buffersData = r.getBuffersData()
     const meshData = r.getMeshData()
     const bindGroupsDescriptors = r.getBindGroupsDescriptors(renderPipeline);

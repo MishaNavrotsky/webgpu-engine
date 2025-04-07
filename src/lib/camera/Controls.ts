@@ -9,7 +9,7 @@ export default class Controls {
     document.addEventListener('keyup', (e) => {
       this._keysMap.delete(e.key.toLowerCase())
     })
-    document.addEventListener('mouseout', (e) => {
+    document.addEventListener('mouseout', (_e) => {
       this._keysMap.clear();
     })
 
