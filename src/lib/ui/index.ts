@@ -1,10 +1,10 @@
 import { BindingParams, FolderApi, Pane } from 'tweakpane'
-import Camera from "@/lib/Camera";
-import Controls from "@/lib/Controls";
-import Loader from "@/lib/Loader";
-import Renderer, { DRENDER_MODES } from "@/lib/Renderer";
+import Camera from "@/lib/camera";
+import Controls from "@/lib/camera/Controls";
+import Loader from "@/lib/loader";
+import Renderer, { DRENDER_MODES } from "@/lib/render";
 import { vec3toXYZ, XYZtoVec3, XYZWtoVec4 } from '@/utils/vec3utils';
-import Engine from '@/lib/Engine';
+import Engine from '@/lib/engine';
 
 export type UIConstructor = {
   loader: Loader,

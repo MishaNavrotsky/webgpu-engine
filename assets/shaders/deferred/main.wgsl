@@ -154,16 +154,16 @@ fn fragment_main(in: VertexOut) -> @location(0) vec4f {
         var lightPos = pointLights[i].worldPosition.xyz;
         // calculate per-light radiance
         var L = normalize(lightPos - worldPosition.xyz);
-        if (true) {
-          L = -vec3f(0, -1, 0);
-        }
+        // if (true) {
+        //   L = -vec3f(0, -1, 0);
+        // }
         var H = normalize(V + L);
         var distance    = length(lightPos - worldPosition.xyz);
         var attenuation = 1.0 / (distance * distance);
-        var radiance     = min(light.color.xyz, vec3f(1,1,1)) * attenuation * light.irzz.x;
-        if (true) {
-          radiance = light.color.xyz;
-        }
+        var radiance     = min(light.color.xyz, vec3f(1,1,1)) * attenuation * light.irtz.x;
+        // if (true) {
+        //   radiance = light.color.xyz;
+        // }
         
         // cook-torrance brdf
         var NDF = DistributionGGX(N, H, metalicRoughness.y);        

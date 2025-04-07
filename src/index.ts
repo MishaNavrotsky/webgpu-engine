@@ -1,10 +1,10 @@
-import Camera from "./lib/Camera";
-import Controls from "./lib/Controls";
-import Loader from "./lib/Loader";
-import Engine from "./lib/Engine";
-import Renderer from "./lib/Renderer";
-import UI from "./ui";
-import Scene from "./lib/Scene";
+import Camera from "@/lib/camera";
+import Controls from "@/lib/camera/Controls";
+import Loader from "@/lib/loader";
+import Engine from "@/lib/engine";
+import Renderer from "@/lib/render";
+import UI from "@/lib/ui";
+import Scene from "./lib/scene";
 
 const canvas = document.getElementsByTagName('canvas')[0];
 canvas.addEventListener('click', async () => {
