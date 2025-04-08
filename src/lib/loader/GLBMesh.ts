@@ -131,6 +131,10 @@ export default class GLBMesh {
         })
         const material = this.getMaterial(p.material)
         p.pbr = { ...material.pbrMetallicRoughness }
+
+        p.pbr.metallicFactor = p.pbr.metallicFactor ?? 1
+        p.pbr.roughnessFactor = p.pbr.roughnessFactor ?? 1
+
         p.indices = this.resolveAccessorBufferData(p.indices);
         p.colorTexture = await this.resolveTextureByMaterial(p.material, 'pbrMetallicRoughness.baseColorTexture.index');
         p.normalTexture = await this.resolveTextureByMaterial(p.material, 'normalTexture.index');

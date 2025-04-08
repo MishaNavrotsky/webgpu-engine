@@ -2,7 +2,7 @@ import { BindingParams, FolderApi, Pane } from 'tweakpane'
 import Camera from "@/lib/camera";
 import Controls from "@/lib/camera/Controls";
 import Loader from "@/lib/loader";
-import Renderer from "@/lib/render";
+import Renderer, { DRENDER_MODES } from "@/lib/render";
 import { vec3toXYZ, XYZtoVec3, XYZWtoVec4 } from '@/utils/vec3utils';
 import Engine from '@/lib/engine';
 
@@ -98,8 +98,12 @@ export default class UI {
       title: 'Deferred'
     })
 
-    console.log(999)
-
+    this._deferredSettingsFolder.addBlade({
+      view: 'list',
+      label: 'render',
+      options: Object.entries(DRENDER_MODES).map(([k, v]) => ({ text: k, value: v })),
+      value: 0,
+    });
 
     this._deferredSettingsFolder.on('change', (v) => this._deferredSettings = v.value as number)
   }

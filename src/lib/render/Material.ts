@@ -142,8 +142,8 @@ export default class Material {
       normalTexture: device.createTexture(texSettings(TEXTURE_IDS.normalTexture)),
     }
     device.queue.writeTexture({ texture: this._zeroedTextures.colorTexture }, new Uint8Array([0, 0, 0, 0]), {}, { width: 1, height: 1 })
-    device.queue.writeTexture({ texture: this._zeroedTextures.emissiveTexture }, new Uint8Array([0, 0, 0, 0]), {}, { width: 1, height: 1 })
-    device.queue.writeTexture({ texture: this._zeroedTextures.metalicRoughnessTexture }, new Uint8Array([0, 0, 0, 0]), {}, { width: 1, height: 1 })
+    device.queue.writeTexture({ texture: this._zeroedTextures.emissiveTexture }, new Uint8Array([255, 255, 255, 0]), {}, { width: 1, height: 1 })
+    device.queue.writeTexture({ texture: this._zeroedTextures.metalicRoughnessTexture }, new Uint8Array([255, 255, 255, 255]), {}, { width: 1, height: 1 })
     device.queue.writeTexture({ texture: this._zeroedTextures.normalTexture }, new Uint8Array([0, 0, 0, 0]), {}, { width: 1, height: 1 })
 
     this._zeroedSamplers = {
