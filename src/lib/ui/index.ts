@@ -49,7 +49,7 @@ export default class UI {
   private _lightInfo = {
     position: { x: 0, y: 28, z: 161, w: 0 },
     color: { x: 1, y: 1, z: 1, w: 0 },
-    intensityRadiusZZ: { x: 0.5, y: 1000, z: 0, w: 0 },
+    intensityRadiusZZ: { x: 9000, y: 1000, z: 0, w: 0 },
   }
 
   private _deferredSettings = 0;

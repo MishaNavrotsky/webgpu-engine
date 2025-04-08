@@ -4,7 +4,7 @@ import Material, { BindGroupType } from "../Material";
 import MeshData from "../MeshData";
 import ModelMatrix from "../ModelMatrix";
 import BuffersData from "../BuffersData";
-import { VERTEX_BUFFER_IDS, TEXTURE_SAMPLERS_IDS, INDICES_BUFFER_ID, UNIFORM_BUFFER_IDS } from "@/constants";
+import { VERTEX_BUFFER_IDS, TEXTURE_SAMPLERS_IDS, INDICES_BUFFER_ID, UNIFORM_BUFFER_IDS, TEXTURE_IDS } from "@/constants";
 import GLBMesh from "@/lib/loader/GLBMesh";
 import RenderPipeline from "../RenderPipeline";
 import Loader from "@/lib/loader";
@@ -117,7 +117,7 @@ export default class RenderableObject implements IRenderableObject {
   }
 
   static async createFromGLB(glbMesh: GLBMesh, device: GPUDevice, loader: Loader): Promise<RenderableObject[]> {
-    const _generateMaterialsBD = (md: MeshData) => {
+    const _generateMaterialsBD = (md: MeshData, primitive: any) => {
       const createGPUTexture = (i: ImageBitmap | undefined, label: string): GPUTexture | undefined => {
         return i && device.createTexture({
           format: 'rgba8unorm',
@@ -152,15 +152,17 @@ export default class RenderableObject implements IRenderableObject {
       const tangetsBuffer = createGPUBuffer(md.tangents, GPUBufferUsage.VERTEX | GPUBufferUsage.COPY_DST, VERTEX_BUFFER_IDS.tangentsBuffer);
 
 
-      const colorTexture = createGPUTexture(md.textures?.color, 'colorTexture');
-      const normalTexture = createGPUTexture(md.textures?.normal, 'normalTexture');
-      const emissiveTexture = createGPUTexture(md.textures?.emissive, 'emissiveTexture');
-      const metalicRoughnessTexture = createGPUTexture(md.textures?.metalicRoughness!, 'metalicRoughnessTexture');
+      const colorTexture = createGPUTexture(md.textures?.color, TEXTURE_IDS.colorTexture);
+      const normalTexture = createGPUTexture(md.textures?.normal, TEXTURE_IDS.normalTexture);
+      const emissiveTexture = createGPUTexture(md.textures?.emissive, TEXTURE_IDS.emissiveTexture);
+      const metalicRoughnessTexture = createGPUTexture(md.textures?.metalicRoughness!, TEXTURE_IDS.metalicRoughnessTexture);
+      const occlusionTexture = createGPUTexture(md.textures?.occlusion!, TEXTURE_IDS.occlusionTexture);
 
       const colorTextureSampler = colorTexture && device.createSampler({ ...md.samplers?.color, label: TEXTURE_SAMPLERS_IDS.colorSampler });
       const emissiveTextureSampler = emissiveTexture && device.createSampler({ ...md.samplers?.emissive, label: TEXTURE_SAMPLERS_IDS.emissiveSampler });
       const metalicRoughnessTextureSampler = metalicRoughnessTexture && device.createSampler({ ...md.samplers?.metalicRoughness, label: TEXTURE_SAMPLERS_IDS.metalicRoughnessSampler });
       const normalTextureSampler = normalTexture && device.createSampler({ ...md.samplers?.normal, label: TEXTURE_SAMPLERS_IDS.normalSampler });
+      const occlusionSampler = occlusionTexture && device.createSampler({ ...md.samplers?.occlusion, label: TEXTURE_SAMPLERS_IDS.occlusionSampler });
 
       const uniformBuffers: GPUBuffer[] = [
         device.createBuffer({
@@ -192,13 +194,15 @@ export default class RenderableObject implements IRenderableObject {
       populateGPUTexture(md.textures?.emissive, emissiveTexture);
       populateGPUTexture(md.textures?.normal, normalTexture);
       populateGPUTexture(md.textures?.metalicRoughness, metalicRoughnessTexture);
+      populateGPUTexture(md.textures?.occlusion, occlusionTexture);
 
       const renderPipeline = new RenderPipeline({
         id: md.id,
         shaderModule: device.createShaderModule({
           code: loader.getShader('main')!,
           label: 'main',
-        })
+        }),
+        cullMode: primitive.material.doubleSided ? 'none' : 'back'
       })
 
       const material = Material.create({
@@ -212,7 +216,16 @@ export default class RenderableObject implements IRenderableObject {
         metalicRoughnessTexture: metalicRoughnessTexture,
         normalSampler: normalTextureSampler,
         normalTexture: normalTexture,
+        occlusionSampler,
+        occlusionTexture,
         uniformBuffers,
+        factors: {
+          baseColor: primitive.pbr.baseColorFactor,
+          emissive: primitive.emissiveFactor,
+          metallic: primitive.pbr.metallicFactor,
+          occlusion: primitive.occlusionStrength,
+          roughness: primitive.pbr.roughnessFactor,
+        }
       }, device)
 
       const buffersData = BuffersData.create({
@@ -243,17 +256,19 @@ export default class RenderableObject implements IRenderableObject {
           color: primitive.colorTexture?.sampler,
           normal: primitive.normalTexture?.sampler,
           emissive: primitive.emissiveTexture?.sampler,
-          metalicRoughness: primitive.metallicRoughnessTexture?.sampler
+          metalicRoughness: primitive.metallicRoughnessTexture?.sampler,
+          occlusion: primitive.occlusionTexture?.sampler
         },
         textures: {
           color: primitive.colorTexture?.image,
           normal: primitive.normalTexture?.image,
           emissive: primitive.emissiveTexture?.image,
-          metalicRoughness: primitive.metallicRoughnessTexture?.image
+          metalicRoughness: primitive.metallicRoughnessTexture?.image,
+          occlusion: primitive.occlusionTexture?.image
         }
       })
 
-      const d = _generateMaterialsBD(meshData)
+      const d = _generateMaterialsBD(meshData, primitive)
 
 
       const r = new RenderableObject({

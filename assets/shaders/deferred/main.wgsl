@@ -146,6 +146,7 @@ fn fragment_main(in: VertexOut) -> @location(0) vec4f {
       var V = normalize(camera.worldPosition.xyz - worldPosition.xyz);
       var metalic = metalicRoughness.b;
       var roughness = metalicRoughness.g;
+      var ao = metalicRoughness.r;
 
       var F0 = vec3f(0.04);
       F0 = mix(F0, albedo.xyz, metalic);
@@ -185,7 +186,7 @@ fn fragment_main(in: VertexOut) -> @location(0) vec4f {
         Lo += (kD * albedo.xyz / PI + specular) * radiance * NdotL; 
       }
 
-      var ambient = vec3f(0.001) * albedo.xyz;
+      var ambient = vec3f(0.001) * albedo.xyz * ao;
       var color = ambient + Lo;
       // HDR
       // color = color / (color + vec3(1.0));

@@ -1,6 +1,7 @@
 import { TEXTURE_SAMPLERS_IDS, TEXTURE_IDS, TEX_DEF_SEQUENCE, SAMPLERS_DEF_SEQUENCE } from "@/constants";
 import _ from 'lodash';
 import RenderPipeline from "./RenderPipeline";
+import { vec3, vec4 } from "gl-matrix";
 
 export type MaterialConstructor = {
   id: string,
@@ -10,15 +11,25 @@ export type MaterialConstructor = {
   emissiveTexture?: GPUTexture,
   metalicRoughnessTexture?: GPUTexture,
   normalTexture?: GPUTexture,
+  occlusionTexture?: GPUTexture,
 
   colorSampler?: GPUSampler,
   emissiveSampler?: GPUSampler,
   metalicRoughnessSampler?: GPUSampler,
   normalSampler?: GPUSampler,
+  occlusionSampler?: GPUSampler,
 
   textures?: Array<GPUTexture>,
   samplers?: Array<GPUSampler>,
   uniformBuffers?: Array<GPUBuffer>,
+
+  factors?: {
+    metallic?: number,
+    roughness?: number
+    occlusion?: number,
+    baseColor?: vec4,
+    emissive?: vec3,
+  }
 }
 
 export type BindGroupType = {
@@ -68,6 +79,9 @@ export default class Material {
   get normalTexture() {
     return this._s.normalTexture;
   }
+  get occlusionTexture() {
+    return this._s.occlusionTexture;
+  }
 
   get colorSampler() {
     return this._s.colorSampler;
@@ -80,6 +94,19 @@ export default class Material {
   }
   get normalSampler() {
     return this._s.normalSampler;
+  }
+  get occlusionSampler() {
+    return this._s.occlusionSampler;
+  }
+
+  get factors() {
+    return {
+      metallic: this._s.factors?.metallic ?? 1,
+      roughness: this._s.factors?.roughness ?? 1,
+      occlusion: this._s.factors?.occlusion ?? 1,
+      baseColor: this._s.factors?.baseColor ?? [1, 1, 1, 1],
+      emissive: this._s.factors?.emissive ?? [0, 0, 0, 0],
+    }
   }
 
 
@@ -98,6 +125,9 @@ export default class Material {
   swapNormalTexture(tex: GPUTexture) {
     this._s.normalTexture = tex;
   }
+  swapOcclusionTexture(tex: GPUTexture) {
+    this._s.occlusionTexture = tex;
+  }
 
   swapSamplers(samplers: GPUSampler[]) {
     this._s.samplers = samplers;
@@ -114,6 +144,9 @@ export default class Material {
   }
   swapNormalSampler(sampler: GPUSampler) {
     this._s.normalSampler = sampler;
+  }
+  swapOcclusionSampler(sampler: GPUSampler) {
+    this._s.occlusionSampler = sampler;
   }
 
   swapUniformBuffers(ubs: GPUBuffer[]) {
@@ -140,17 +173,20 @@ export default class Material {
       emissiveTexture: device.createTexture(texSettings(TEXTURE_IDS.emissiveTexture)),
       metalicRoughnessTexture: device.createTexture(texSettings(TEXTURE_IDS.metalicRoughnessTexture)),
       normalTexture: device.createTexture(texSettings(TEXTURE_IDS.normalTexture)),
+      occlusionTexture: device.createTexture(texSettings(TEXTURE_IDS.occlusionTexture)),
     }
-    device.queue.writeTexture({ texture: this._zeroedTextures.colorTexture }, new Uint8Array([0, 0, 0, 0]), {}, { width: 1, height: 1 })
+    device.queue.writeTexture({ texture: this._zeroedTextures.colorTexture }, new Uint8Array([255, 255, 255, 0]), {}, { width: 1, height: 1 })
     device.queue.writeTexture({ texture: this._zeroedTextures.emissiveTexture }, new Uint8Array([255, 255, 255, 0]), {}, { width: 1, height: 1 })
-    device.queue.writeTexture({ texture: this._zeroedTextures.metalicRoughnessTexture }, new Uint8Array([255, 255, 255, 255]), {}, { width: 1, height: 1 })
+    device.queue.writeTexture({ texture: this._zeroedTextures.metalicRoughnessTexture }, new Uint8Array([0, 255, 255, 0]), {}, { width: 1, height: 1 })
     device.queue.writeTexture({ texture: this._zeroedTextures.normalTexture }, new Uint8Array([0, 0, 0, 0]), {}, { width: 1, height: 1 })
+    device.queue.writeTexture({ texture: this._zeroedTextures.occlusionTexture }, new Uint8Array([0, 0, 0, 0]), {}, { width: 1, height: 1 })
 
     this._zeroedSamplers = {
-      colorSampler: device.createSampler({ magFilter: 'linear', minFilter: 'linear', mipmapFilter: 'linear', label: TEXTURE_SAMPLERS_IDS.colorSampler, maxAnisotropy: 16 }),
+      colorSampler: device.createSampler({ magFilter: 'linear', minFilter: 'linear', mipmapFilter: 'linear', label: TEXTURE_SAMPLERS_IDS.colorSampler }),
       emissiveSampler: device.createSampler({ magFilter: 'linear', minFilter: 'linear', mipmapFilter: 'linear', label: TEXTURE_SAMPLERS_IDS.emissiveSampler }),
-      metalicRoughnessSampler: device.createSampler({ magFilter: 'linear', minFilter: 'linear', mipmapFilter: 'linear', label: TEXTURE_SAMPLERS_IDS.metalicRoughnessSampler, maxAnisotropy: 16 }),
-      normalSampler: device.createSampler({ magFilter: 'linear', minFilter: 'linear', mipmapFilter: 'linear', label: TEXTURE_SAMPLERS_IDS.normalSampler, maxAnisotropy: 16 })
+      metalicRoughnessSampler: device.createSampler({ magFilter: 'linear', minFilter: 'linear', mipmapFilter: 'linear', label: TEXTURE_SAMPLERS_IDS.metalicRoughnessSampler }),
+      normalSampler: device.createSampler({ magFilter: 'linear', minFilter: 'linear', mipmapFilter: 'linear', label: TEXTURE_SAMPLERS_IDS.normalSampler }),
+      occlusionSampler: device.createSampler({ magFilter: 'linear', minFilter: 'linear', mipmapFilter: 'linear', label: TEXTURE_SAMPLERS_IDS.occlusionSampler }),
     }
 
     this._initialized = true;
@@ -164,11 +200,13 @@ export default class Material {
       normalTexture: s.normalTexture || this._zeroedTextures.normalTexture,
       emissiveTexture: s.emissiveTexture || this._zeroedTextures.emissiveTexture,
       metalicRoughnessTexture: s.metalicRoughnessTexture || this._zeroedTextures.metalicRoughnessTexture,
+      occlusionTexture: s.occlusionTexture || this._zeroedTextures.occlusionTexture,
 
       colorSampler: s.colorSampler || this._zeroedSamplers.colorSampler,
       normalSampler: s.normalSampler || this._zeroedSamplers.normalSampler,
       emissiveSampler: s.emissiveSampler || this._zeroedSamplers.colorSampler,
       metalicRoughnessSampler: s.metalicRoughnessSampler || this._zeroedSamplers.metalicRoughnessSampler,
+      occlusionSampler: s.occlusionSampler || this._zeroedSamplers.occlusionSampler,
 
       textures: s.textures,
       samplers: s.samplers,

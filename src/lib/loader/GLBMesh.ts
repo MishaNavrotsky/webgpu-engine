@@ -134,12 +134,18 @@ export default class GLBMesh {
 
         p.pbr.metallicFactor = p.pbr.metallicFactor ?? 1
         p.pbr.roughnessFactor = p.pbr.roughnessFactor ?? 1
+        p.pbr.baseColorFactor = p.pbr.baseColorFactor ?? [1, 1, 1, 1]
+        p.emissiveFactor = material.emissiveFactor || [0, 0, 0]
+        p.occlusionStrength = material.occlusionTexture?.strength ?? 1
 
         p.indices = this.resolveAccessorBufferData(p.indices);
         p.colorTexture = await this.resolveTextureByMaterial(p.material, 'pbrMetallicRoughness.baseColorTexture.index');
         p.normalTexture = await this.resolveTextureByMaterial(p.material, 'normalTexture.index');
         p.emissiveTexture = await this.resolveTextureByMaterial(p.material, 'emissiveTexture.index');
         p.metallicRoughnessTexture = await this.resolveTextureByMaterial(p.material, 'pbrMetallicRoughness.metallicRoughnessTexture.index');
+        p.occlusionTexture = await this.resolveTextureByMaterial(p.material, 'occlusionTexture.index');
+
+        p.material = material;
       }
 
       return nm

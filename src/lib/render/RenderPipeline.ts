@@ -9,6 +9,7 @@ export type RenderPipelineConstructor = {
   fragmentTargets?: Array<GPUColorTargetState>,
   primitiveState?: GPUPrimitiveState,
   depthStencilState?: GPUDepthStencilState,
+  cullMode?: GPUCullMode,
 }
 
 export type BindGroupType = {
@@ -60,7 +61,7 @@ export default class RenderPipeline {
       primitive: settings.primitiveState ?? {
         topology: "triangle-list",
         frontFace: "ccw",
-        cullMode: 'none'
+        cullMode: this._settings.cullMode ?? 'none'
       },
       multisample: {
         count: MULTISAMPLE_COUNT,

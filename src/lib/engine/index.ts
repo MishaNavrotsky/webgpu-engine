@@ -32,12 +32,16 @@ export default class Engine {
 
     const mwall = await new GLBMesh(await this._loader.getGLB('wall')!);
 
+    const maircraft = await new GLBMesh(await this._loader.getGLB('aircraft')!);
+
+
     const device = this._renderer.getDevice()
 
     const tyan = await RenderableObject.createFromGLB(mtyan, device, this._loader)
     const boxes = await RenderableObject.createFromGLB(mboxes, device, this._loader)
     const spaceship = await RenderableObject.createFromGLB(mspaceship, device, this._loader)
     const wall = await RenderableObject.createFromGLB(mwall, device, this._loader)
+    const aircraft = await RenderableObject.createFromGLB(maircraft, device, this._loader)
 
     tyan.forEach(r => {
       r.scale([0.005, 0.005, 0.005]);
@@ -73,6 +77,7 @@ export default class Engine {
     await this._loader.loadGLB('boxes', '/assets/models/furniture_decor_sculpture_8mb.glb');
     await this._loader.loadGLB('spaceship', '/assets/models/star_wars_galaxies_-_eta-2_actis_interceptor.glb');
     await this._loader.loadGLB('wall', '/assets/models/brick_wall.glb');
+    await this._loader.loadGLB('aircraft', '/assets/models/su-33_flanker-d.glb');
 
 
     await this._renderer.initWebGpuCanvasContext();

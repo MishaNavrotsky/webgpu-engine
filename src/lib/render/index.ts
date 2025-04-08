@@ -30,7 +30,7 @@ type PointLight = {
   intensityRadiusZZ: vec4,
 }
 
-export type RData = Array<{ renderableObject: IRenderableObject, renderPipeline?: GPURenderPipeline, type?: 'forward' | 'deferred' }>
+export type RData = Array<{ renderableObject: IRenderableObject, renderPipeline?: GPURenderPipeline, dPassFactorsUniforms?: GPUBuffer, type?: 'forward' | 'deferred' }>
 
 type RendererConstructor = {
   camera: Camera, loader: Loader, canvas: HTMLCanvasElement
@@ -57,6 +57,8 @@ export default class Renderer {
   private _dPassResult?: GPUTexture[];
   private _dPassMaterial?: Material;
   private _dPassRenderPipeline?: GPURenderPipeline;
+  private _dPassFactorsUniforms?: GPUBuffer;
+
 
   constructor(settings: RendererConstructor) {
     this._canvas = settings.canvas;
@@ -269,6 +271,12 @@ export default class Renderer {
       renderPipeline,
     }, this._device)
 
+
+    // struct Factors {
+    //   mroz: vec4f,
+    //   baseColor: vec4f,
+    //   emissive: vec4f,
+    // }
     this._dPassRenderPipeline = this._device.createRenderPipeline(renderPipeline.descriptor);
     this.prepareTexturesForGBuffers();
     this.prepareMeshForGBuffers();
@@ -305,12 +313,14 @@ export default class Renderer {
       dMaterial.swapEmissiveTexture(rMaterial.emissiveTexture!);
       dMaterial.swapMetalicRoughnessTexture(rMaterial.metalicRoughnessTexture!);
       dMaterial.swapNormalTexture(rMaterial.normalTexture!);
+      dMaterial.swapOcclusionTexture(rMaterial.occlusionTexture!);
 
       dMaterial.swapSamplers(rMaterial.samplers!);
       dMaterial.swapColorSampler(rMaterial.colorSampler!);
       dMaterial.swapEmissiveSampler(rMaterial.emissiveSampler!);
       dMaterial.swapMetalicRoughnessSampler(rMaterial.metalicRoughnessSampler!);
       dMaterial.swapNormalSampler(rMaterial.normalSampler!);
+      dMaterial.swapOcclusionSampler(rMaterial.occlusionSampler!);
 
       const modelMatrix = r.getModelMatrix();
       const viewMatrix = this._camera.viewMatrix;
@@ -321,7 +331,26 @@ export default class Renderer {
 
       const cameraUB = rMaterial.uniformBuffers![0]
       this._device.queue.writeBuffer(cameraUB, 0, new Float32Array([...projectionMatrix, ...viewMatrix, ...modelMatrix, ...normalMatrix, ...this._camera.position, 0]));
-      dMaterial.swapUniformBuffers([cameraUB]);
+      // struct Factors {
+      //   mroz: vec4f,
+      //   baseColor: vec4f,
+      //   emissive: vec4f,
+      // }
+
+      if (!m.dPassFactorsUniforms) {
+        m.dPassFactorsUniforms = this._device.createBuffer({
+          label: 'dPassUniforms',
+          usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
+          size: 4 * 4 + 4 * 4 + 4 * 4,
+        })
+      }
+      const toWrite = new Float32Array([
+        rMaterial.factors.metallic, rMaterial.factors.roughness, rMaterial.factors.occlusion, 1,
+        rMaterial.factors.baseColor[0], rMaterial.factors.baseColor[1], rMaterial.factors.baseColor[2], rMaterial.factors.baseColor[3],
+        rMaterial.factors.emissive[0], rMaterial.factors.emissive[1], rMaterial.factors.emissive[2], 0
+      ])
+      this._device.queue.writeBuffer(m.dPassFactorsUniforms!, 0, toWrite);
+      dMaterial.swapUniformBuffers([cameraUB, m.dPassFactorsUniforms!]);
 
       this.renderRenderable(m.renderableObject, this._dPassRenderPipeline!, passEncoder);
 

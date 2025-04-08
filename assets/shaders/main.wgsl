@@ -35,12 +35,15 @@ struct Settings {
 @group(1) @binding(1) var normalTexture : texture_2d<f32>;
 @group(1) @binding(2) var emissiveTexture : texture_2d<f32>;
 @group(1) @binding(3) var metalicRoughnessTexture : texture_2d<f32>;
+@group(1) @binding(4) var aoT : texture_2d<f32>;
 
 
 @group(2) @binding(0) var colorSampler : sampler;
 @group(2) @binding(1) var normalSampler : sampler;
 @group(2) @binding(2) var emissiveSampler : sampler;
 @group(2) @binding(3) var metalicRoughnessSampler : sampler;
+@group(2) @binding(4) var aoS : sampler;
+
 
 
 @vertex
@@ -64,6 +67,7 @@ fn fragment_main(in: VertexOut) -> @location(0) vec4f {
   var normalSample = textureSample(normalTexture, normalSampler, in.texCoords.xy);  
   var emissive = textureSample(emissiveTexture, emissiveSampler, in.texCoords.xy);
   var metalicRoughness = textureSample(metalicRoughnessTexture, metalicRoughnessSampler, in.texCoords.xy);
+  var ao = textureSample(aoT, aoS, in.texCoords.xy);
 
   var T = normalize((camera.model * vec4(in.tangents,   0.0)).xyz);
   var B = normalize((camera.model * vec4(in.bitangents, 0.0)).xyz);

@@ -1,7 +1,7 @@
 export type MeshDataConstructor = {
   id: string,
-  textures?: { color?: ImageBitmap, normal?: ImageBitmap, emissive?: ImageBitmap, metalicRoughness?: ImageBitmap },
-  samplers?: { color?: GPUSamplerDescriptor, normal?: GPUSamplerDescriptor, emissive?: GPUSamplerDescriptor, metalicRoughness?: GPUSamplerDescriptor },
+  textures?: { color?: ImageBitmap, normal?: ImageBitmap, emissive?: ImageBitmap, metalicRoughness?: ImageBitmap, occlusion?: ImageBitmap },
+  samplers?: { color?: GPUSamplerDescriptor, normal?: GPUSamplerDescriptor, emissive?: GPUSamplerDescriptor, metalicRoughness?: GPUSamplerDescriptor, occlusion?: GPUSamplerDescriptor },
   vertecies: Float32Array,
   indices: Uint32Array,
   texCoords?: Float32Array,

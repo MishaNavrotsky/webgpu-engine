@@ -5,14 +5,16 @@ export const TEXTURE_IDS = {
   colorTexture: 'colorTexture',
   normalTexture: 'normalTexture',
   emissiveTexture: 'emissiveTexture',
-  metalicRoughnessTexture: 'metalicRoughnessTexture'
+  metalicRoughnessTexture: 'metalicRoughnessTexture',
+  occlusionTexture: 'occlusionTexture',
 } as const
 
 export const TEXTURE_SAMPLERS_IDS = {
   colorSampler: 'colorSampler',
   normalSampler: 'normalSampler',
   emissiveSampler: 'emissiveSampler',
-  metalicRoughnessSampler: 'metalicRoughnessSampler'
+  metalicRoughnessSampler: 'metalicRoughnessSampler',
+  occlusionSampler: 'occlusionSampler',
 } as const
 
 export const VERTEX_BUFFER_IDS = {
@@ -44,11 +46,10 @@ export const UNIFORM_BUFFER_IDS = {
 }
 
 export const D_PASS_TEXTURE_FORMAT: GPUTextureFormat = 'rgba32float'
-export const D_PASS_FRAGMENT_OUTS = ['albedo', 'emissive', 'metalicRoughness', 'pNormals', 'worldPosition', 'vBiTangents', 'vNormals', 'vTangents'] as const
+export const D_PASS_FRAGMENT_OUTS = ['albedo', 'emissive', 'aoMetalicRoughness', 'pNormals', 'worldPosition', 'vBiTangents', 'vNormals', 'vTangents'] as const
 
-export const LIGHT_TYPES = ['point', 'directional', 'spot'] as const
+export const LIGHT_TYPES = { point: 'point', directional: 'directional', spot: 'spot' } as const
 
 export const VBS_DEF_SEQUENCE = [VERTEX_BUFFER_IDS.positionBuffer, VERTEX_BUFFER_IDS.texCoordsBuffer, VERTEX_BUFFER_IDS.normalsBuffer, VERTEX_BUFFER_IDS.tangentsBuffer]
-export const TEX_DEF_SEQUENCE = [TEXTURE_IDS.colorTexture, TEXTURE_IDS.normalTexture, TEXTURE_IDS.emissiveTexture, TEXTURE_IDS.metalicRoughnessTexture]
-export const SAMPLER_DEF_SEQUENCE = [TEXTURE_SAMPLERS_IDS.colorSampler, TEXTURE_SAMPLERS_IDS.normalSampler, TEXTURE_SAMPLERS_IDS.emissiveSampler, TEXTURE_SAMPLERS_IDS.metalicRoughnessSampler]
-export const SAMPLERS_DEF_SEQUENCE = [TEXTURE_SAMPLERS_IDS.colorSampler, TEXTURE_SAMPLERS_IDS.normalSampler, TEXTURE_SAMPLERS_IDS.emissiveSampler, TEXTURE_SAMPLERS_IDS.metalicRoughnessSampler]
+export const TEX_DEF_SEQUENCE = [TEXTURE_IDS.colorTexture, TEXTURE_IDS.normalTexture, TEXTURE_IDS.emissiveTexture, TEXTURE_IDS.metalicRoughnessTexture, TEXTURE_IDS.occlusionTexture]
+export const SAMPLERS_DEF_SEQUENCE = [TEXTURE_SAMPLERS_IDS.colorSampler, TEXTURE_SAMPLERS_IDS.normalSampler, TEXTURE_SAMPLERS_IDS.emissiveSampler, TEXTURE_SAMPLERS_IDS.metalicRoughnessSampler, TEXTURE_SAMPLERS_IDS.occlusionSampler]
