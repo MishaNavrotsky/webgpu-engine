@@ -113,7 +113,7 @@ export default class Renderer {
     this._context.configure({
       device: this._device,
       format: navigator.gpu.getPreferredCanvasFormat(),
-      alphaMode: "premultiplied",
+      alphaMode: "opaque",
     });
     this.createDepthTexture();
     this.createDeferredDepthTexture();
