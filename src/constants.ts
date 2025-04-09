@@ -53,3 +53,5 @@ export const LIGHT_TYPES = { point: 'point', directional: 'directional', spot: '
 export const VBS_DEF_SEQUENCE = [VERTEX_BUFFER_IDS.positionBuffer, VERTEX_BUFFER_IDS.texCoordsBuffer, VERTEX_BUFFER_IDS.normalsBuffer, VERTEX_BUFFER_IDS.tangentsBuffer]
 export const TEX_DEF_SEQUENCE = [TEXTURE_IDS.colorTexture, TEXTURE_IDS.normalTexture, TEXTURE_IDS.emissiveTexture, TEXTURE_IDS.metalicRoughnessTexture, TEXTURE_IDS.occlusionTexture]
 export const SAMPLERS_DEF_SEQUENCE = [TEXTURE_SAMPLERS_IDS.colorSampler, TEXTURE_SAMPLERS_IDS.normalSampler, TEXTURE_SAMPLERS_IDS.emissiveSampler, TEXTURE_SAMPLERS_IDS.metalicRoughnessSampler, TEXTURE_SAMPLERS_IDS.occlusionSampler]
+
+export const DIRECTIONAL_LIGHT_DEPTH_TEXTURE_SIZE = [1024, 1024]

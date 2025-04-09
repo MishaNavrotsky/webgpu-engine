@@ -57,7 +57,6 @@ export default class Renderer {
   private _dPassResult?: GPUTexture[];
   private _dPassMaterial?: Material;
   private _dPassRenderPipeline?: GPURenderPipeline;
-  private _dPassFactorsUniforms?: GPUBuffer;
 
 
   constructor(settings: RendererConstructor) {

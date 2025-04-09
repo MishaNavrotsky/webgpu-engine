@@ -10,16 +10,6 @@ export default class Loader {
 
   }
 
-  async init() {
-    const i = new Image();
-    i.src = 'assets/textures/default-texture.png'
-    this._defaultTexture = await new Promise((res, rej) => {
-      i.onload = async (ev) => {
-        res(await createImageBitmap(i))
-      }
-    })
-  }
-
   private getGLBId(id: string) {
     return `GLB/${id}`
   }
@@ -48,3 +38,5 @@ export default class Loader {
     return this._defaultTexture;
   }
 }
+
+export const GlobalLoader = new Loader();

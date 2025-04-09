@@ -68,6 +68,7 @@ export default class Engine {
   async start() {
     this._controls.subscribe();
     await this._loader.loadShader('main', '/assets/shaders/main.wgsl');
+    await this._loader.loadShader('zbuffer', '/assets/shaders/zbuffer.wgsl');
 
     await this._loader.loadShader('deferred/prepareBuffers', '/assets/shaders/deferred/prepareBuffers.wgsl');
     await this._loader.loadShader('deferred/main', '/assets/shaders/deferred/main.wgsl');

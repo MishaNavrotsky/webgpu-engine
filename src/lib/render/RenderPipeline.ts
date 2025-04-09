@@ -10,6 +10,7 @@ export type RenderPipelineConstructor = {
   primitiveState?: GPUPrimitiveState,
   depthStencilState?: GPUDepthStencilState,
   cullMode?: GPUCullMode,
+  fragmentPipelineDescriptorState?: GPUFragmentState | null,
 }
 
 export type BindGroupType = {
@@ -42,6 +43,17 @@ export default class RenderPipeline {
     this._compiledShader = settings.shaderModule;
     this._vertexBuffersState = settings.vertexBuffersState ?? defaultVBS;
 
+    let fragment: GPUFragmentState | undefined = {
+      module: this._compiledShader,
+      entryPoint: "fragment_main",
+      targets: this._settings.fragmentTargets ?? [
+        {
+          format: navigator.gpu.getPreferredCanvasFormat(),
+        },
+      ],
+    }
+    if (this._settings.fragmentTargets === null) fragment = undefined;
+
     this._renderPipelineDescriptor = {
       label: this._settings.id,
       vertex: {
@@ -49,15 +61,7 @@ export default class RenderPipeline {
         entryPoint: "vertex_main",
         buffers: this._vertexBuffersState,
       },
-      fragment: {
-        module: this._compiledShader,
-        entryPoint: "fragment_main",
-        targets: this._settings.fragmentTargets ?? [
-          {
-            format: navigator.gpu.getPreferredCanvasFormat(),
-          },
-        ],
-      },
+      fragment: fragment,
       primitive: settings.primitiveState ?? {
         topology: "triangle-list",
         frontFace: "ccw",

@@ -1,6 +1,6 @@
 import Camera from "@/lib/camera";
 import Controls from "@/lib/camera/Controls";
-import Loader from "@/lib/loader";
+import { GlobalLoader } from "@/lib/loader";
 import Engine from "@/lib/engine";
 import Renderer from "@/lib/render";
 import UI from "@/lib/ui";
@@ -14,8 +14,7 @@ canvas.addEventListener('click', async () => {
 })
 
 async function init() {
-  const loader = new Loader();
-  await loader.init();
+  const loader = GlobalLoader;
   const controls = new Controls();
   const camera = new Camera(controls)
   const scene = new Scene();

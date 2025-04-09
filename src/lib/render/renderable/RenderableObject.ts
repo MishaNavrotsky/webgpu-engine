@@ -2,7 +2,7 @@ import { mat4, vec3 } from "gl-matrix";
 import IRenderableObject from "../interfaces/IRenderableObject";
 import Material, { BindGroupType } from "../Material";
 import MeshData from "../MeshData";
-import ModelMatrix from "../ModelMatrix";
+import ModelMatrix from "../../ModelMatrix";
 import BuffersData from "../BuffersData";
 import { VERTEX_BUFFER_IDS, TEXTURE_SAMPLERS_IDS, INDICES_BUFFER_ID, UNIFORM_BUFFER_IDS, TEXTURE_IDS } from "@/constants";
 import GLBMesh from "@/lib/loader/GLBMesh";
