@@ -25,6 +25,7 @@ struct Settings {
 @group(0) @binding(0) var<uniform> camera: Camera;
 @group(0) @binding(1) var<storage> pointLights: array<PointLight>;
 @group(0) @binding(2) var<uniform> settings: Settings;
+@group(0) @binding(3) var<uniform> lightProjectionView: mat4x4f;
 
 
 @group(1) @binding(0) var tAlbedo : texture_2d<f32>;
@@ -35,6 +36,10 @@ struct Settings {
 @group(1) @binding(5) var tvBiTangents : texture_2d<f32>;
 @group(1) @binding(6) var tvNormals : texture_2d<f32>;
 @group(1) @binding(7) var tvTangents : texture_2d<f32>;
+@group(1) @binding(8) var depthTexture : texture_depth_2d;
+
+@group(2) @binding(0) var depthTextureSampler: sampler_comparison;
+
 
 @vertex
 fn vertex_main(@location(0) position: vec4f, @location(1) texCoords: vec2f) -> VertexOut {
@@ -115,6 +120,9 @@ fn fragment_main(in: VertexOut) -> @location(0) vec4f {
   var vBiTangents = textureLoad(tvBiTangents, pos, 0);
   var vNormals = textureLoad(tvNormals, pos, 0);
   var vTangents = textureLoad(tvTangents, pos, 0);
+  var depth = textureLoad(depthTexture, pos, 0);
+
+
 
   switch settings.mode {
     case 1: {
@@ -152,6 +160,27 @@ fn fragment_main(in: VertexOut) -> @location(0) vec4f {
       F0 = mix(F0, albedo.xyz, metalic);
 
       var Lo = vec3(0.0);
+
+
+      var posInLightSpace = lightProjectionView * worldPosition;
+      var shadowPos = vec3(
+        posInLightSpace.xy * vec2(0.5, -0.5) + vec2(0.5),
+        posInLightSpace.z
+      );
+      var visibility = 0.0;
+      let oneOverShadowDepthTextureSize = 1.0 / 1024.0;
+      for (var y = -1; y <= 1; y++) {
+        for (var x = -1; x <= 1; x++) {
+          let offset = vec2f(vec2(x, y)) * oneOverShadowDepthTextureSize;
+
+          visibility += textureSampleCompare(
+            depthTexture, depthTextureSampler,
+            shadowPos.xy + offset, shadowPos.z - 0.006
+          );
+        }
+      }
+      visibility /= 9.0;
+
       for(var i: u32 = 0; i < arrayLength(&pointLights); i++) {
         var light = pointLights[i];
         var lightPos = pointLights[i].worldPosition.xyz;
@@ -186,7 +215,7 @@ fn fragment_main(in: VertexOut) -> @location(0) vec4f {
         Lo += (kD * albedo.xyz / PI + specular) * radiance * NdotL; 
       }
 
-      var ambient = vec3f(0.001) * albedo.xyz * ao;
+      var ambient = (vec3f(0.5) + visibility) * albedo.xyz * ao;
       var color = ambient + Lo;
       // HDR
       // color = color / (color + vec3(1.0));

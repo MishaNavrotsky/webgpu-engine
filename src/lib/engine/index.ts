@@ -5,6 +5,7 @@ import Renderer from "@/lib/render";
 import Scene from "@/lib/scene";
 import GLBMesh from "../loader/GLBMesh";
 import RenderableObject from "../render/renderable/RenderableObject";
+import DirectionalLight from "../render/renderable/DirectionalLight";
 
 export type EngineConstructor = {
   renderer: Renderer, loader: Loader, controls: Controls, ui?: UI, scene: Scene,
@@ -63,6 +64,15 @@ export default class Engine {
     this._scene.addMesh(boxes);
     this._scene.addMesh(spaceship);
     this._scene.addMesh(wall);
+
+    const directionalLight = DirectionalLight.create({
+      direction: [0.5, -1, 2],
+      id: 'dirLight',
+      position: [0.72, 230.46, 200.43],
+    }, device)
+
+
+    this._scene.addLight(directionalLight)
   }
 
   async start() {

@@ -8,7 +8,7 @@ export type RenderPipelineConstructor = {
   vertexBuffersState?: (GPUVertexBufferLayout & { label: string })[],
   fragmentTargets?: Array<GPUColorTargetState>,
   primitiveState?: GPUPrimitiveState,
-  depthStencilState?: GPUDepthStencilState,
+  depthStencilState?: GPUDepthStencilState | null,
   cullMode?: GPUCullMode,
   fragmentPipelineDescriptorState?: GPUFragmentState | null,
 }
@@ -43,7 +43,7 @@ export default class RenderPipeline {
     this._compiledShader = settings.shaderModule;
     this._vertexBuffersState = settings.vertexBuffersState ?? defaultVBS;
 
-    let fragment: GPUFragmentState | undefined = {
+    let fragment: GPUFragmentState | undefined = this._settings.fragmentPipelineDescriptorState || {
       module: this._compiledShader,
       entryPoint: "fragment_main",
       targets: this._settings.fragmentTargets ?? [
@@ -52,7 +52,14 @@ export default class RenderPipeline {
         },
       ],
     }
-    if (this._settings.fragmentTargets === null) fragment = undefined;
+    if (this._settings.fragmentPipelineDescriptorState === null) fragment = undefined;
+
+    let depthStencil: GPUDepthStencilState | undefined = this._settings.depthStencilState || {
+      format: DEPTH_STENCIL_FORMAT,
+      depthWriteEnabled: true,
+      depthCompare: 'less',
+    }
+    if (this._settings.depthStencilState === null) depthStencil = undefined;
 
     this._renderPipelineDescriptor = {
       label: this._settings.id,
@@ -71,11 +78,7 @@ export default class RenderPipeline {
         count: MULTISAMPLE_COUNT,
       },
       layout: "auto",
-      depthStencil: settings.depthStencilState ?? {
-        format: DEPTH_STENCIL_FORMAT,
-        depthWriteEnabled: true,
-        depthCompare: 'less',
-      }
+      depthStencil,
     };
   }
 

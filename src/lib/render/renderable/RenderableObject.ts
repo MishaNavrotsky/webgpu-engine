@@ -29,6 +29,15 @@ export default class RenderableObject implements IRenderableObject {
     this.id = v.id;
     this._s = v;
   }
+  getScale(): vec3 {
+    return this._cModelMatrix.scale
+  }
+  getRotationDeg(): vec3 {
+    return this._cModelMatrix.rotation
+  }
+  getPosition(): vec3 {
+    return this._cModelMatrix.translation
+  }
 
   getBindGroupsDescriptors(grp: GPURenderPipeline): Array<BindGroupType> {
     const material = this.getMaterial();

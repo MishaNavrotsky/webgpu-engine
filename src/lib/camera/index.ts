@@ -59,7 +59,7 @@ class Camera {
     this._width = width;
     this._height = height;
 
-    mat4.perspectiveZO(this._mProjection, glMatrix.toRadian(this._fov), this._width / this._height, 0.1, Infinity);
+    mat4.perspectiveZO(this._mProjection, glMatrix.toRadian(this._fov), this._width / this._height, 0.1, 1000);
   }
 
   lookAt(v: vec3) {

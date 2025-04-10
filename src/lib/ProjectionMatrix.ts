@@ -7,9 +7,9 @@ export default class ProjectionMatrix {
   private _near: number = 0.001;
   private _far: number = Infinity;
 
-  private _left: number = 0;
+  private _left: number = -100;
   private _right: number = 100;
-  private _top: number = 0;
+  private _top: number = -100;
   private _bottom: number = 100;
 
 
@@ -47,5 +47,30 @@ export default class ProjectionMatrix {
   }
   set far(v: number) {
     this._far = v;
+  }
+
+  set left(n: number) {
+    this._left = n;
+  }
+  get left() {
+    return this._left;
+  }
+  set right(n: number) {
+    this._right = n;
+  }
+  get right() {
+    return this._right;
+  }
+  set bottom(n: number) {
+    this._bottom = n;
+  }
+  get bottom() {
+    return this._bottom;
+  }
+  set top(n: number) {
+    this._top = n;
+  }
+  get top() {
+    return this._top;
   }
 }

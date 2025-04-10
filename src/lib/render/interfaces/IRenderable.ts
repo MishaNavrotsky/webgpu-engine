@@ -1,17 +1,12 @@
-import { mat4, vec3 } from "gl-matrix";
 import Material, { BindGroupType } from "../Material";
 import BuffersData from "../BuffersData";
+import IModelPosition from "./IModelPosition";
 
-export default interface IRenderable {
-  getModelMatrix(): mat4;
+export default interface IRenderable extends IModelPosition {
   getBuffersData(): BuffersData;
   getMaterial(): Material;
   swapMaterial(m: Material): void;
   getBindGroupsDescriptors(grp: GPURenderPipeline): Array<BindGroupType>;
-
-  scale(v: vec3): void;
-  translate(v: vec3): void;
-  rotateDeg(v: vec3): void;
 
   readonly id: string;
 }

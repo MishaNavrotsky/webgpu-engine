@@ -1,4 +1,4 @@
-import { mat4, vec4 } from "gl-matrix";
+import { mat4, vec3, vec4 } from "gl-matrix";
 import Camera from "@/lib/camera";
 import Loader from "@/lib/loader";
 import Material from "./Material";
@@ -10,7 +10,10 @@ import RenderableObject from "./renderable/RenderableObject";
 import BuffersData from "./BuffersData";
 import RenderPipeline from "./RenderPipeline";
 import IRenderableObject from "./interfaces/IRenderableObject";
-import Scene from "../scene";
+import IRenderPassLight from "./interfaces/IRenderPassLight";
+import IRenderable from "./interfaces/IRenderable";
+import DirectionalLight from "./renderable/DirectionalLight";
+import IModelPosition from "./interfaces/IModelPosition";
 
 export const DRENDER_MODES = {
   diffuse: 0,
@@ -31,12 +34,15 @@ type PointLight = {
 }
 
 export type RData = Array<{ renderableObject: IRenderableObject, renderPipeline?: GPURenderPipeline, dPassFactorsUniforms?: GPUBuffer, type?: 'forward' | 'deferred' }>
+export type LData = Array<{ lightData: IRenderPassLight, renderPipeline?: GPURenderPipeline }>
 
 type RendererConstructor = {
   camera: Camera, loader: Loader, canvas: HTMLCanvasElement
 }
 export default class Renderer {
   private _meshes: RData = [];
+  private _lights: LData = [];
+
   private _camera: Camera;
   private _loader: Loader;
   private _canvas: HTMLCanvasElement
@@ -207,11 +213,46 @@ export default class Renderer {
     })
   }
 
+  async renderLights() {
+    for (const light of this._lights) {
+      const encoder = this._device.createCommandEncoder({ label: 'lights' });
+      const passEncoder = encoder.beginRenderPass(light.lightData.getRenderPassDescriptor());
+
+      if (light.lightData.type === 'directional') {
+        const l = light.lightData as DirectionalLight
+        const d = this._ui!.lightsInfo.color!;
+        l.rotateDeg(vec3.fromValues(d[0], d[1], d[2]));
+        DirectionalLight.populate(l, this._device, this._camera);
+      }
+
+      for (const r of this._meshes) {
+        if (r.type === 'forward') continue;
+        const rM = r.renderableObject.getMaterial()
+        const modelMatrix = r.renderableObject.getModelMatrix();
+        const zeroMatrix = mat4.create();
+        const viewMatrix = this._camera.viewMatrix;
+        const projectionMatrix = this._camera.projectionMatrix;
+        this._device.queue.writeBuffer(rM.uniformBuffers![0], 0, new Float32Array([...projectionMatrix, ...viewMatrix, ...modelMatrix, ...zeroMatrix, 0, 0, 0, 0]));
+
+
+        const gM = light.lightData.generateMaterial()
+        gM.swapUniformBuffers([rM.uniformBuffers![0], light.lightData.getUniformProjectionViewMatrix()])
+        r.renderableObject.swapMaterial(gM);
+        this.renderRenderable(r.renderableObject, light.renderPipeline!, passEncoder);
+
+        r.renderableObject.swapMaterial(rM);
+      }
+      passEncoder.end();
+      this._device.queue.submit([encoder.finish()]);
+    }
+  }
+
   async render(dT: number) {
     this._callbackToDoBeforeRender();
     const cpuTimeStart = performance.now()
     {
       this._camera.calculate(dT, true);
+      await this.renderLights();
       await this.renderGBuffers();
       await this.forwardRender();
     }
@@ -385,7 +426,12 @@ export default class Renderer {
       if (m.type !== 'forward') continue;
       const r = m.renderableObject;
       const material = r.getMaterial();
-
+      const textures = [...material.textures!]
+      const uniforms = [...material.uniformBuffers!]
+      const samplers = [...material.samplers! || []]
+      material.swapTextures([...material.textures!, this._lights[0].lightData.getOutputTextures()])
+      material.swapUniformBuffers([...material.uniformBuffers!, this._lights[0].lightData.getUniformProjectionViewMatrix()])
+      material.swapSamplers([...samplers, this._lights[0].lightData.getTextureSampler()])
       const modelMatrix = r.getModelMatrix();
       const viewMatrix = this._camera.viewMatrix;
       const projectionMatrix = this._camera.projectionMatrix;
@@ -403,6 +449,10 @@ export default class Renderer {
       const renderPipeline = m.renderPipeline;
 
       this.renderRenderable(r, renderPipeline!, passEncoder);
+
+      material.swapTextures(textures);
+      material.swapUniformBuffers(uniforms);
+      material.swapSamplers(samplers);
     }
 
     passEncoder.end();
@@ -417,7 +467,6 @@ export default class Renderer {
     const bindGroups = bindGroupsDescriptors.map(desc => {
       return this._device.createBindGroup(desc.description)
     })
-
     passEncoder.setPipeline(renderPipeline);
     bindGroupsDescriptors.forEach(desc => {
       passEncoder.setBindGroup(desc.index, bindGroups[desc.index])
@@ -433,12 +482,19 @@ export default class Renderer {
 
   }
 
-  async prepareMeshes(scene: Scene['_sceneRenderables']) {
-    scene.forEach(el => {
+  async prepareMeshes(scene: { renderables: IRenderable[]; lights: IRenderPassLight[]; }) {
+    scene.renderables.forEach(el => {
       const renderPipeline = this._device.createRenderPipeline(el.getMaterial().renderPipeline.descriptor);
       const r = { renderableObject: el as IRenderableObject, renderPipeline }
 
       this._meshes.push(r);
+    })
+
+    scene.lights.forEach(el => {
+      const renderPipeline = this._device.createRenderPipeline(el.getRenderPipeline().descriptor);
+      const l = { lightData: el, renderPipeline }
+
+      this._lights.push(l);
     })
   }
 }
